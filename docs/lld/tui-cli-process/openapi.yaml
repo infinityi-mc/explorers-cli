@@ -1,0 +1,1299 @@
+openapi: 3.1.0
+info:
+  title: explorers-cli TUI & CLI Process — Interface Contracts
+  version: 1.0.0
+  description: |
+    LLD-level API contract for the `TUI & CLI Process` container of
+    `explorers-cli` v1.0.
+
+    Because `explorers-cli` is a **local terminal application** (NG-5: no
+    inbound HTTP server), this is NOT a network API. It is a contract over
+    three interface surfaces that the container exposes to its in-process and
+    child-process callers:
+
+    1. **Operator TUI slash-command interface** — commands the operator types
+       in the TUI command line. Surfaced as `x-explorers-cli/operator-command`
+       (a non-HTTP "protocol" extension).
+    2. **In-game chat interface** — the log-line pattern the Chat Parser
+       recognizes on Minecraft server stdout, plus the `/tellraw` stdin
+       writes the Agent Executor emits back. Surfaced as
+       `x-explorers-cli/ingame-chat`.
+    3. **Agent tool-call schema** — the JSON-schema tool definitions
+       registered with the LLM provider via `@infinityi/engine-lib`. These
+       are real JSON Schemas (draft 2020-12) consumed by the provider
+       adapters. Surfaced as standard OpenAPI operation request bodies with
+       `application/json`.
+
+    Implements HLD ADRs: ADR-001 (REST+SSE for LLM provider comms, via
+    engine-lib), ADR-004 (sandboxed tool broker, via engine-lib tools-shell +
+    tools-fs), ADR-006 (chat parser + permissions).
+
+    SRS requirements covered:
+    - FR-CHAT-001..011 — In-game chat parsing, permissions, rate limits
+    - FR-INV-001..009 — Agent invocation and response delivery
+    - FR-TOOL-001..011 — Agent tool authorization and file safety
+    - FR-SRV-001..020 — Server lifecycle (operator commands)
+    - FR-HOT-001..010 — Hot-reload (operator `/reload` if exposed)
+    - NFR-SEC-001..010 — Security (path containment, name sanitization, etc.)
+    - NFR-OBS-004 — Audit logging of agent tool calls
+
+  contact:
+    name: explorers-cli engineering
+    url: https://github.com/infinityi-mc/explorers-cli
+
+servers: []
+
+security: []
+
+tags:
+  - name: OperatorCommands
+    description: Slash commands typed by the operator in the TUI command line.
+  - name: InGameChat
+    description: Log-line patterns the Chat Parser recognizes on Minecraft server stdout, and the `/tellraw` stdin writes the Agent Executor emits back.
+  - name: AgentTools
+    description: JSON-Schema tool definitions registered with the LLM provider via `@infinityi/engine-lib`.
+
+paths:
+  /operator/start:
+    post:
+      tags: [OperatorCommands]
+      operationId: operatorStart
+      summary: /start <server>
+      description: |
+        Operator slash-command. Starts the named Minecraft server child
+        process. Idempotent within a 5-second window per `serverId`
+        (see `idempotency.md`). Blocked in `--read-only` mode
+        (ADR-LLD-003).
+
+        Implements: FR-SRV-001 (start with configured Java params),
+        FR-SRV-008 (port check via TCP bind, no RCON), FR-SRV-010 (startup
+        timeout), FR-SRV-018 (record PID), NFR-SEC-002 (jarFile inside
+        canonical server.path), NFR-REL-005 (crash → FAILED within 2 s).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartServerRequest"
+            examples:
+              happy:
+                $ref: "#/components/examples/StartServerHappy"
+              already_running:
+                $ref: "#/components/examples/StartServerAlreadyRunning"
+      responses:
+        "200":
+          description: Server start initiated (or idempotent replay)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartServerResponse"
+              examples:
+                started:
+                  $ref: "#/components/examples/StartServerResponseStarted"
+        "409":
+          description: Conflict — server already running or starting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                already_running:
+                  $ref: "#/components/examples/ErrorAlreadyRunning"
+        "422":
+          description: Validation error (jar not found, port conflict, path traversal)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                port_conflict:
+                  $ref: "#/components/examples/ErrorPortConflict"
+                jar_not_found:
+                  $ref: "#/components/examples/ErrorJarNotFound"
+                path_traversal:
+                  $ref: "#/components/examples/ErrorPathTraversal"
+        "403":
+          description: Blocked by --read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                read_only_blocked:
+                  $ref: "#/components/examples/ErrorReadOnlyBlocked"
+
+  /operator/stop:
+    post:
+      tags: [OperatorCommands]
+      operationId: operatorStop
+      summary: /stop <server>
+      description: |
+        Sends `/stop` to the server's stdin and waits for graceful exit. On
+        timeout (configurable, default 30 s), force-kills the process tree
+        (POSIX process group / Windows Job Object / `taskkill /T /F`).
+        Idempotent: a second `/stop` while the server is already `STOPPED`
+        returns `200` with `state: STOPPED`.
+
+        Implements: FR-SRV-013 (force-kill on stop timeout),
+        NFR-REL-001 (kill child processes on exit).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StopServerRequest"
+            examples:
+              happy:
+                $ref: "#/components/examples/StopServerHappy"
+      responses:
+        "200":
+          description: Server stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StopServerResponse"
+        "409":
+          description: Server not running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                not_running:
+                  $ref: "#/components/examples/ErrorNotRunning"
+
+  /operator/restart:
+    post:
+      tags: [OperatorCommands]
+      operationId: operatorRestart
+      summary: /restart <server>
+      description: Sequential `/stop` then `/start` on the same server. Idempotency is per-phase (each phase has its own dedup window).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestartServerRequest"
+            examples:
+              happy:
+                $ref: "#/components/examples/RestartServerHappy"
+      responses:
+        "200":
+          description: Server restarted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartServerResponse"
+        "403":
+          description: Blocked by --read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                read_only_blocked:
+                  $ref: "#/components/examples/ErrorReadOnlyBlocked"
+        "404":
+          description: Server not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                server_not_found:
+                  $ref: "#/components/examples/ErrorServerNotFound"
+        "409":
+          description: Server not running or already running during restart phase
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /operator/chat:
+    post:
+      tags: [OperatorCommands]
+      operationId: operatorChat
+      summary: /chat <agent> <message>
+      description: |
+        Routes a prompt directly to the named agent persona. When `serverId`
+        is provided, the agent run uses the same session as a corresponding
+        in-game mention would (shared `(serverId, agentId)` key — see
+        ADR-LLD-004). When `serverId` is omitted, the run is offline: no
+        session is persisted and no in-game delivery is attempted.
+
+        Streams tokens to the TUI chat panel. Blocked in `--read-only` mode.
+
+        Implements: FR-INV-001 (offline chat), FR-INV-002 (streaming tokens
+        to TUI), FR-INV-003 (timeout abort), FR-SES-004 (shared session
+        key).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperatorChatRequest"
+            examples:
+              happy:
+                $ref: "#/components/examples/OperatorChatHappy"
+      responses:
+        "200":
+          description: Agent run handle (streaming)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentRunResponse"
+        "404":
+          description: Agent or server not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                agent_not_found:
+                  $ref: "#/components/examples/ErrorAgentNotFound"
+                server_not_found:
+                  $ref: "#/components/examples/ErrorServerNotFound"
+        "403":
+          description: Blocked by --read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                read_only_blocked:
+                  $ref: "#/components/examples/ErrorReadOnlyBlocked"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                config_invalid:
+                  $ref: "#/components/examples/ErrorConfigInvalid"
+        "429":
+          description: LLM provider rate-limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                provider_rate_limited:
+                  $ref: "#/components/examples/ErrorProviderRateLimited"
+        "500":
+          description: Agent run failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                context_window:
+                  $ref: "#/components/examples/ErrorContextWindow"
+                max_steps:
+                  $ref: "#/components/examples/ErrorMaxSteps"
+                max_handoffs:
+                  $ref: "#/components/examples/ErrorMaxHandoffs"
+                budget:
+                  $ref: "#/components/examples/ErrorBudget"
+        "503":
+          description: LLM provider unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                provider_unavailable:
+                  $ref: "#/components/examples/ErrorProviderUnavailable"
+        "504":
+          description: Provider timeout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                provider_timeout:
+                  $ref: "#/components/examples/ErrorProviderTimeout"
+
+  /operator/session:
+    get:
+      tags: [OperatorCommands]
+      operationId: operatorSessionList
+      summary: /session
+      description: Lists active session contexts (serverId, agentId, last message timestamp, message count). Allowed in `--read-only` mode.
+      responses:
+        "200":
+          description: Session list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionListResponse"
+
+  /operator/resume:
+    post:
+      tags: [OperatorCommands]
+      operationId: operatorResume
+      summary: /resume <id>
+      description: |
+        Reloads the TUI chat window with the history of the specified
+        session ID. When `sessionId` is omitted, returns the last 20 available
+        session IDs for the current server and agent (FR-SES-011). Read-only
+        operation — does NOT start a new agent run. Allowed in `--read-only` mode.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResumeRequest"
+      responses:
+        "200":
+          description: Session resumed into TUI view, or last 20 sessions listed when sessionId is omitted
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/SessionDetailResponse"
+                  - $ref: "#/components/schemas/SessionListResponse"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                session_not_found:
+                  $ref: "#/components/examples/ErrorSessionNotFound"
+
+  /operator/clear:
+    post:
+      tags: [OperatorCommands]
+      operationId: operatorClear
+      summary: /clear [server] [agent]
+      description: |
+        Resets the session database cache context for the selected
+        server/agent combination. Does NOT delete rows from
+        `data/sessions.db` — only clears the in-memory session handle.
+        Persisted history remains and can be resumed via `/resume`.
+        Blocked in `--read-only` mode.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClearRequest"
+            examples:
+              happy:
+                $ref: "#/components/examples/ClearSessionHappy"
+      responses:
+        "200":
+          description: Cache cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClearResponse"
+        "403":
+          description: Blocked by --read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                read_only_blocked:
+                  $ref: "#/components/examples/ErrorReadOnlyBlocked"
+        "404":
+          description: Server or agent not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                server_not_found:
+                  $ref: "#/components/examples/ErrorServerNotFound"
+                agent_not_found:
+                  $ref: "#/components/examples/ErrorAgentNotFound"
+
+  /operator/help:
+    get:
+      tags: [OperatorCommands]
+      operationId: operatorHelp
+      summary: /help
+      description: Lists all available TUI slash commands with one-line descriptions. Allowed in `--read-only` mode.
+      responses:
+        "200":
+          description: Help text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpResponse"
+
+  /ingame/chat:
+    post:
+      tags: [InGameChat]
+      operationId: ingameChatLine
+      summary: Parsed in-game chat line (from Minecraft server stdout)
+      description: |
+        The Chat Parser scans each line emitted on a Minecraft server's
+        stdout. A line matches if it conforms to the vanilla chat format
+        `[HH:MM:SS] [Server thread/INFO]: <playername> message` (SRS
+        FR-CHAT-001). Non-matching lines are silently skipped (FR-CHAT-002).
+
+        This endpoint describes the **parsed shape** that the Chat Parser
+        emits to the MentionRouter. The raw line is NOT a JSON request —
+        it's a regex match. This endpoint exists so the contract is
+        machine-checkable.
+
+        Implements: FR-CHAT-001..011, NFR-SEC-005 (case-insensitive),
+        NFR-SEC-006 (name sanitization), NFR-SEC-010 (UTF-8).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngameChatLine"
+            examples:
+              mention:
+                $ref: "#/components/examples/IngameChatMention"
+              help_trigger:
+                $ref: "#/components/examples/IngameChatHelpTrigger"
+              ignored:
+                $ref: "#/components/examples/IngameChatIgnored"
+      responses:
+        "200":
+          description: Parse result (mention, help trigger, or ignored)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngameChatParseResult"
+              examples:
+                mention:
+                  $ref: "#/components/examples/IngameChatParseMention"
+                help:
+                  $ref: "#/components/examples/IngameChatParseHelp"
+                ignored:
+                  $ref: "#/components/examples/IngameChatParseIgnored"
+
+  /ingame/tellraw:
+    post:
+      tags: [InGameChat]
+      operationId: ingameTellraw
+      summary: /tellraw stdin write (Agent Executor → Minecraft server)
+      description: |
+        When an agent run finishes (or streams a chunk that fits the
+        Minecraft chat limit of 256 chars), the Agent Executor writes a
+        `/tellraw @a {text:"..."}` command to the server's stdin. The
+        server broadcasts the message to all connected players.
+
+        Implements: FR-INV-009 (chunked /tellraw delivery).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TellrawRequest"
+            examples:
+              happy:
+                $ref: "#/components/examples/TellrawHappy"
+              chunked:
+                $ref: "#/components/examples/TellrawChunked"
+      responses:
+        "200":
+          description: stdin write accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TellrawResponse"
+
+  /agent-tools/run_command:
+    post:
+      tags: [AgentTools]
+      operationId: agentRunCommand
+      summary: run_command tool (engine-lib tools-shell)
+      description: |
+        Agent tool. Executes a Minecraft console command on the named
+        server's stdin and returns the stdout response. The command must
+        match the agent's `commandAllowlist` (token-prefix match,
+        FR-TOOL-004). Deny-by-default (FR-TOOL-002). The server must be
+        `RUNNING` — otherwise `OFFLINE_FAIL` (HLD error catalog).
+
+        Provided by `engine-lib/tools-shell`'s `shellTools()` factory. The
+        tool's JSON Schema is what the LLM provider advertises.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunCommandArgs"
+            examples:
+              say:
+                $ref: "#/components/examples/RunCommandSay"
+              blocked:
+                $ref: "#/components/examples/RunCommandBlocked"
+      responses:
+        "200":
+          description: Tool result (success or recoverable failure)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResult"
+              examples:
+                success:
+                  $ref: "#/components/examples/ToolResultSuccess"
+                blocked:
+                  $ref: "#/components/examples/ToolResultBlocked"
+                offline:
+                  $ref: "#/components/examples/ToolResultOffline"
+
+  /agent-tools/read_file:
+    post:
+      tags: [AgentTools]
+      operationId: agentReadFile
+      summary: read_file tool (engine-lib tools-fs)
+      description: |
+        Agent tool. Reads a file inside the server's sandbox root
+        (`server.path`). Canonical path must resolve inside the root
+        (FR-TOOL-008). Symlinks resolving outside the root are blocked
+        (FR-TOOL-009). Returns the verbatim file content.
+
+        Provided by `engine-lib/tools-fs`'s `filesystemTools()` factory
+        (`read` tool).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReadFileArgs"
+            examples:
+              happy:
+                $ref: "#/components/examples/ReadFileHappy"
+              traversal:
+                $ref: "#/components/examples/ReadFileTraversal"
+      responses:
+        "200":
+          description: Tool result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResult"
+              examples:
+                success:
+                  $ref: "#/components/examples/ReadFileSuccess"
+                blocked:
+                  $ref: "#/components/examples/ReadFileBlocked"
+
+  /agent-tools/write_file:
+    post:
+      tags: [AgentTools]
+      operationId: agentWriteFile
+      summary: write_file tool (engine-lib tools-fs)
+      description: |
+        Agent tool. Writes a file inside the server's sandbox root. Blocked
+        when the server is `RUNNING` for NBT files (`.nbt`, `.dat`, `.mca`,
+        `.schem`) and for any delete/move operation (FR-TOOL-006). Path
+        containment enforced identically to `read_file`.
+
+        Provided by `engine-lib/tools-fs`'s `filesystemTools()` factory
+        (`writeFile` tool).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WriteFileArgs"
+            examples:
+              happy:
+                $ref: "#/components/examples/WriteFileHappy"
+              nbt_blocked:
+                $ref: "#/components/examples/WriteFileNbtBlocked"
+      responses:
+        "200":
+          description: Tool result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResult"
+              examples:
+                success:
+                  $ref: "#/components/examples/WriteFileSuccess"
+                blocked:
+                  $ref: "#/components/examples/WriteFileBlocked"
+
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Client-generated UUID. Required for mutating operator commands. Repeat calls with the same key within a
+        5-second window return the original response (operator commands)
+        or are deduped at the tool-call argument level (agent tools).
+        See `idempotency.md` for full rules.
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code from `errors.md`.
+          example: PORT_CONFLICT
+        message:
+          type: string
+          description: Human-readable detail (English source string).
+          example: Port 25565 is already in use by another process.
+        details:
+          type: object
+          additionalProperties: true
+          description: Optional structured details specific to the error code.
+
+    ServerId:
+      type: string
+      pattern: "^[a-zA-Z0-9_-]{1,32}$"
+      description: Matches FR-CFG-005.
+
+    AgentId:
+      type: string
+      pattern: "^[a-zA-Z0-9_-]{1,32}$"
+      description: Matches FR-CFG-005.
+
+    PlayerName:
+      type: string
+      pattern: "^[a-zA-Z0-9_]{1,16}$"
+      description: Vanilla Minecraft name constraint (NFR-SEC-006).
+
+    StartServerRequest:
+      type: object
+      required: [serverId]
+      properties:
+        serverId: { $ref: "#/components/schemas/ServerId" }
+
+    StartServerResponse:
+      type: object
+      required:
+        [
+          serverId,
+          state,
+          pid,
+          lastError,
+          restartCount,
+          startTime,
+          lastSuccessfulStart,
+        ]
+      properties:
+        serverId: { $ref: "#/components/schemas/ServerId" }
+        state:
+          type: string
+          enum: [STOPPED, STARTING, RUNNING, STOPPING, FAILED]
+        pid:
+          type: integer
+          nullable: true
+          description: OS process ID; null when STOPPED or FAILED.
+        lastError:
+          type: string
+          nullable: true
+          description: Most recent failure message; cleared on successful restart.
+        restartCount:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+          nullable: true
+        lastSuccessfulStart:
+          type: string
+          format: date-time
+          nullable: true
+
+    StopServerRequest:
+      type: object
+      required: [serverId]
+      properties:
+        serverId: { $ref: "#/components/schemas/ServerId" }
+        force:
+          type: boolean
+          default: false
+          description: If true, skip the graceful `/stop` stdin write and force-kill immediately.
+
+    StopServerResponse:
+      type: object
+      required: [serverId, state]
+      properties:
+        serverId: { $ref: "#/components/schemas/ServerId" }
+        state:
+          type: string
+          enum: [STOPPING, STOPPED, FAILED]
+        exitCode:
+          type: integer
+          nullable: true
+
+    RestartServerRequest:
+      type: object
+      required: [serverId]
+      properties:
+        serverId: { $ref: "#/components/schemas/ServerId" }
+
+    OperatorChatRequest:
+      type: object
+      required: [agentId, message]
+      properties:
+        agentId: { $ref: "#/components/schemas/AgentId" }
+        serverId:
+          allOf:
+            - $ref: "#/components/schemas/ServerId"
+          nullable: true
+          description: Optional. If omitted, the agent runs without a server context (offline chat — FR-INV-001).
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+
+    AgentRunResponse:
+      type: object
+      required: [runId, agentId, stream]
+      properties:
+        runId:
+          type: string
+          description: engine-lib run identifier (`run_<uuid>`).
+        agentId: { $ref: "#/components/schemas/AgentId" }
+        stream:
+          type: boolean
+          description: Always true for operator `/chat` — tokens stream to the TUI.
+        completed:
+          type: string
+          format: uri
+          description: Internal handle URI; the TUI subscribes via the engine-lib RunHandle async iterable.
+
+    SessionListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required:
+              [sessionId, serverId, agentId, lastMessageAt, messageCount]
+            properties:
+              sessionId: { type: string }
+              serverId: { $ref: "#/components/schemas/ServerId" }
+              agentId: { $ref: "#/components/schemas/AgentId" }
+              lastMessageAt: { type: string, format: date-time }
+              messageCount: { type: integer }
+
+    ResumeRequest:
+      type: object
+      required: [sessionId]
+      properties:
+        sessionId: { type: string }
+
+    SessionDetailResponse:
+      type: object
+      required: [sessionId, serverId, agentId, messages]
+      properties:
+        sessionId: { type: string }
+        serverId: { $ref: "#/components/schemas/ServerId" }
+        agentId: { $ref: "#/components/schemas/AgentId" }
+        messages:
+          type: array
+          items:
+            type: object
+            required: [role, content, timestamp]
+            properties:
+              role:
+                type: string
+                enum: [user, assistant, system, tool]
+              content:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+              playerContext:
+                type: object
+                required: [playerName]
+                additionalProperties: true
+                properties:
+                  playerName:
+                    type: string
+                    description: Player name, or "operator" for TUI-originated messages.
+
+    ClearRequest:
+      type: object
+      properties:
+        serverId:
+          allOf:
+            - $ref: "#/components/schemas/ServerId"
+          nullable: true
+        agentId:
+          allOf:
+            - $ref: "#/components/schemas/AgentId"
+          nullable: true
+      description: If both omitted, clears all in-memory session handles.
+
+    ClearResponse:
+      type: object
+      required: [cleared]
+      properties:
+        cleared:
+          type: integer
+          description: Number of in-memory session handles dropped.
+
+    HelpResponse:
+      type: object
+      required: [commands]
+      properties:
+        commands:
+          type: array
+          items:
+            type: object
+            required: [name, summary, mutating]
+            properties:
+              name:
+                type: string
+                example: /start
+              summary:
+                type: string
+              mutating:
+                type: boolean
+                description: True if blocked in --read-only mode.
+
+    IngameChatLine:
+      type: object
+      required: [raw, serverId]
+      properties:
+        raw:
+          type: string
+          description: |
+            The full stdout line, including the `[HH:MM:SS] [Server thread/INFO]: ` prefix.
+            The Chat Parser attempts a vanilla format match.
+          example: "[12:34:56] [Server thread/INFO]: <Steve> @assistant hello"
+        serverId:
+          allOf:
+            - $ref: "#/components/schemas/ServerId"
+          description: |
+            The server whose stdout emitted this line. Required because the Chat
+            Parser consults `permissions.<serverId>.players` (design.md Algorithm 1
+            step 5) — without serverId the parser cannot authorize mentions.
+            The Log Reader's per-server `for await` loop supplies this value
+            out-of-band; the schema requires it to keep the contract explicit.
+
+    IngameChatParseResult:
+      type: object
+      required: [kind, serverId, playerName, occurredAt]
+      properties:
+        kind:
+          type: string
+          enum: [mention, help_trigger, ignored]
+        serverId:
+          allOf:
+            - $ref: "#/components/schemas/ServerId"
+          description: Echoed from the input line so downstream consumers (MentionRouter, help-trigger handler, audit log) know which server the parse came from.
+        playerName:
+          allOf:
+            - $ref: "#/components/schemas/PlayerName"
+          description: The sanitized vanilla MC name from `<playername>` brackets, after team prefix/suffix stripping. Always present, even for `ignored` lines, so the audit log can record who triggered the line.
+        occurredAt:
+          type: string
+          format: date-time
+          description: Timestamp extracted from the `[HH:MM:SS]` line prefix (interpreted as local server time) or `now()` if absent.
+        mention:
+          type: object
+          nullable: true
+          description: Present when kind=mention.
+          required: [agentId, message]
+          properties:
+            agentId: { $ref: "#/components/schemas/AgentId" }
+            message:
+              type: string
+              description: The text after the `@alias ` prefix is stripped (Algorithm 1 step 7).
+
+    TellrawRequest:
+      type: object
+      required: [serverId, text]
+      properties:
+        serverId: { $ref: "#/components/schemas/ServerId" }
+        text:
+          type: string
+          maxLength: 200
+          description: The chat-visible text for one chunk. The Agent Executor splits full responses into <=200-character chunks before wrapping each in /tellraw JSON.
+        selector:
+          type: string
+          default: "@a"
+          description: Minecraft target selector. Defaults to all players.
+
+    TellrawResponse:
+      type: object
+      required: [written]
+      properties:
+        written:
+          type: boolean
+
+    RunCommandArgs:
+      type: object
+      required: [command]
+      properties:
+        command:
+          type: string
+          description: The Minecraft console command, e.g. `say Hello` or `whitelist add Steve`.
+          example: say Hello
+
+    ReadFileArgs:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+          description: Path relative to the server's sandbox root. Canonicalized and containment-checked.
+
+    WriteFileArgs:
+      type: object
+      required: [path, content]
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+
+    ToolResult:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        content:
+          type: string
+          nullable: true
+          description: Present when ok=true. For run_command, the stdout response. For read_file, the file content. For write_file, a confirmation message.
+        error:
+          type: string
+          nullable: true
+          description: Present when ok=false. A recoverable domain error message (the agent can retry with a different approach).
+
+  examples:
+    StartServerHappy:
+      summary: Valid start request
+      value:
+        serverId: survival
+
+    StartServerAlreadyRunning:
+      summary: Server already running
+      value:
+        serverId: survival
+
+    StartServerResponseStarted:
+      summary: Server start initiated
+      value:
+        serverId: survival
+        state: STARTING
+        pid: 4242
+        lastError: null
+        restartCount: 0
+        startTime: "2026-06-19T12:34:56Z"
+        lastSuccessfulStart: null
+
+    StopServerHappy:
+      summary: Valid stop request
+      value:
+        serverId: survival
+        force: false
+
+    OperatorChatHappy:
+      summary: Operator chats with the assistant agent
+      value:
+        agentId: assistant
+        serverId: survival
+        message: Summarize the latest deployment status.
+
+    RestartServerHappy:
+      summary: Restart a configured server
+      value:
+        serverId: survival
+
+    ClearSessionHappy:
+      summary: Clear one in-memory session handle
+      value:
+        serverId: survival
+        agentId: assistant
+
+    IngameChatMention:
+      summary: Player mentions an agent
+      value:
+        raw: "[12:34:56] [Server thread/INFO]: <Steve> @assistant hello"
+        serverId: survival
+
+    IngameChatHelpTrigger:
+      summary: Player asks for help
+      value:
+        raw: "[12:34:57] [Server thread/INFO]: <Steve> !help"
+        serverId: survival
+
+    IngameChatIgnored:
+      summary: Non-chat log line (silently ignored)
+      value:
+        raw: "[12:34:58] [Server thread/INFO]: Steve joined the game"
+        serverId: survival
+
+    IngameChatParseMention:
+      summary: Mention parsed and authorized
+      value:
+        kind: mention
+        serverId: survival
+        playerName: Steve
+        occurredAt: "2026-06-19T12:34:56Z"
+        mention:
+          agentId: assistant
+          message: hello
+
+    IngameChatParseHelp:
+      summary: Help trigger parsed
+      value:
+        kind: help_trigger
+        serverId: survival
+        playerName: Steve
+        occurredAt: "2026-06-19T12:34:57Z"
+
+    IngameChatParseIgnored:
+      summary: Line ignored (not a chat line)
+      value:
+        kind: ignored
+        serverId: survival
+        playerName: Steve
+        occurredAt: "2026-06-19T12:34:58Z"
+
+    TellrawHappy:
+      summary: Single-chunk /tellraw
+      value:
+        serverId: survival
+        text: Hello from the assistant!
+
+    TellrawChunked:
+      summary: First chunk of a multi-chunk response
+      value:
+        serverId: survival
+        text: "Part 1: The deployment is healthy. "
+
+    RunCommandSay:
+      summary: Allowed command (matches allowlist)
+      value:
+        command: say Hello world
+
+    RunCommandBlocked:
+      summary: Disallowed command (not in allowlist)
+      value:
+        command: op Steve
+
+    ReadFileHappy:
+      summary: Read a config file inside the sandbox
+      value:
+        path: server.properties
+
+    ReadFileTraversal:
+      summary: Path traversal attempt (blocked)
+      value:
+        path: ../../etc/passwd
+
+    WriteFileHappy:
+      summary: Write a file inside the sandbox while server is stopped
+      value:
+        path: plugins/my-agent/config.json
+        content: '{"enabled":true}'
+
+    WriteFileNbtBlocked:
+      summary: Write to an NBT file while server is running (blocked)
+      value:
+        path: world/level.dat
+        content: ""
+
+    ToolResultSuccess:
+      summary: Tool succeeded
+      value:
+        ok: true
+        content: "[12:34:59] [Server thread/INFO]: [Server] Hello world"
+
+    ToolResultBlocked:
+      summary: Tool blocked by policy (recoverable)
+      value:
+        ok: false
+        error: COMMAND_BLOCKED — command "op" is not in the allowlist
+
+    ToolResultOffline:
+      summary: Tool failed because server is stopped
+      value:
+        ok: false
+        error: OFFLINE_FAIL — server "survival" is not running
+
+    ReadFileSuccess:
+      summary: File read
+      value:
+        ok: true
+        content: |
+          #Minecraft server properties
+          server-port=25565
+          max-players=20
+
+    ReadFileBlocked:
+      summary: Path traversal blocked
+      value:
+        ok: false
+        error: PATH_TRAVERSAL_BLOCKED — path resolves outside sandbox root
+
+    WriteFileSuccess:
+      summary: File written
+      value:
+        ok: true
+        content: wrote 24 bytes to plugins/my-agent/config.json
+
+    WriteFileBlocked:
+      summary: Write blocked (NBT while running)
+      value:
+        ok: false
+        error: COMMAND_BLOCKED — cannot write .nbt files while server is RUNNING
+
+    ErrorAlreadyRunning:
+      summary: Server already running
+      value:
+        code: ALREADY_RUNNING
+        message: Server "survival" is already in state RUNNING.
+        details:
+          serverId: survival
+          currentState: RUNNING
+
+    ErrorPortConflict:
+      summary: Port already bound
+      value:
+        code: PORT_CONFLICT
+        message: Port 25565 is already in use by another process.
+        details:
+          port: 25565
+
+    ErrorJarNotFound:
+      summary: JAR file missing
+      value:
+        code: JAR_NOT_FOUND
+        message: JAR file "server.jar" not found inside /srv/minecraft/survival.
+        details:
+          serverId: survival
+          jarFile: server.jar
+
+    ErrorPathTraversal:
+      summary: jarFile outside canonical server.path
+      value:
+        code: PATH_TRAVERSAL_BLOCKED
+        message: jarFile resolves outside the canonical server.path.
+        details:
+          serverId: survival
+
+    ErrorReadOnlyBlocked:
+      summary: /start blocked in --read-only mode
+      value:
+        code: READ_ONLY_BLOCKED
+        message: This command is blocked in --read-only mode.
+
+    ErrorNotRunning:
+      summary: /stop on a stopped server
+      value:
+        code: NOT_RUNNING
+        message: Server "survival" is not running.
+        details:
+          serverId: survival
+          currentState: STOPPED
+
+    ErrorAgentNotFound:
+      summary: /chat with unknown agent
+      value:
+        code: AGENT_NOT_FOUND
+        message: No agent named "wallace" is configured.
+        details:
+          agentId: wallace
+
+    ErrorServerNotFound:
+      summary: Server not configured
+      value:
+        code: SERVER_NOT_FOUND
+        message: No server named "survival" is configured.
+        details:
+          serverId: survival
+
+    ErrorConfigInvalid:
+      summary: Configuration validation error
+      value:
+        code: CONFIG_INVALID
+        message: "Config validation failed: agents.assistant.alias is missing."
+
+    ErrorProviderRateLimited:
+      summary: LLM provider returned 429
+      value:
+        code: PROVIDER_RATE_LIMITED
+        message: The AI provider is busy. Please slow down.
+        details:
+          retryAfterMs: 30000
+
+    ErrorProviderUnavailable:
+      summary: LLM provider unavailable
+      value:
+        code: PROVIDER_UNAVAILABLE
+        message: The AI provider is temporarily unavailable. Please try again later.
+        details:
+          provider: openai
+
+    ErrorContextWindow:
+      summary: Context window cannot be reduced
+      value:
+        code: CONTEXT_WINDOW_EXCEEDED
+        message: The conversation is too long for the AI to process. Use `/clear` to reset the session.
+
+    ErrorMaxSteps:
+      summary: Agent exceeded max steps
+      value:
+        code: MAX_STEPS_EXCEEDED
+        message: The agent took too many steps without finishing. Try simplifying the request.
+
+    ErrorMaxHandoffs:
+      summary: Agent exceeded max handoffs
+      value:
+        code: MAX_HANDOFFS_EXCEEDED
+        message: The agent handed off too many times. Check the handoff graph for cycles.
+
+    ErrorBudget:
+      summary: Token budget exceeded
+      value:
+        code: BUDGET_EXCEEDED
+        message: The agent used too many tokens. Try simplifying the request.
+
+    ErrorProviderTimeout:
+      summary: LLM provider timeout
+      value:
+        code: PROVIDER_TIMEOUT
+        message: LLM provider did not respond within 120000 ms.
+        details:
+          agentId: assistant
+          provider: openai
+          timeoutMs: 120000
+
+    ErrorInternal:
+      summary: Unexpected internal error
+      value:
+        code: INTERNAL_ERROR
+        message: An unexpected error occurred
+        details:
+          requestId: "req-7f3a-4b1c-9d02-abcdef123456"
+
+    ErrorSessionNotFound:
+      summary: /resume with unknown session
+      value:
+        code: SESSION_NOT_FOUND
+        message: No session with id "sess-abc-123".
+        details:
+          sessionId: sess-abc-123

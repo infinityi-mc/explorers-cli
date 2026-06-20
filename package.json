@@ -1,0 +1,22 @@
+{
+  "name": "explorers-cli",
+  "module": "src/index.tsx",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.tsx"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@infinityi/engine-lib": "^2.0.0",
+    "@infinityi/forge": "^1.0.1",
+    "@opentui/core": "^0.4.1",
+    "@opentui/react": "^0.4.1",
+    "react": "^19.2.6"
+  }
+}
