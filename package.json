@@ -4,19 +4,24 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run --watch src/index.tsx"
+    "dev": "bun run --watch src/index.tsx",
+    "check": "tsc --noEmit",
+    "test": "bun test ./tests/cli.test.ts ./tests/config.test.ts ./tests/lifecycle.test.ts ./tests/openapi.test.ts ./tests/telemetry.test.ts",
+    "build": "bun build src/index.tsx --target bun --outdir dist --external @opentui/core-darwin-x64 --external @opentui/core-darwin-arm64 --external @opentui/core-linux-x64 --external @opentui/core-linux-x64-musl --external @opentui/core-linux-arm64 --external @opentui/core-linux-arm64-musl --external @opentui/core-win32-arm64"
   },
   "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "@types/bun": "latest",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "@infinityi/engine-lib": "^2.0.0",
     "@infinityi/forge": "^1.0.1",
     "@opentui/core": "^0.4.1",
     "@opentui/react": "^0.4.1",
-    "react": "^19.2.6"
+    "react": "^19.2.6",
+    "yaml": "^2.8.1"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
   }
 }

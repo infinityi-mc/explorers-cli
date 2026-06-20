@@ -1,0 +1,52 @@
+# Example explorers-cli config. Copy values into config.yaml and set API keys in the environment.
+schemaVersion: 1
+
+featureFlags:
+  audioplayer: false
+
+telemetry:
+  enabled: false
+
+logging:
+  level: info
+  rotationBytes: 52428800
+
+sessionRetention: P30D
+
+servers:
+  - id: survival
+    name: Survival
+    path: ./servers/survival
+    jarFile: server.jar
+    ram: 2048
+    javaPath: java
+    serverPort: 25565
+    maxPlayers: 20
+    levelName: world
+    startupTimeout: 120
+
+providers:
+  - name: openai
+    type: openai
+    model: gpt-4.1-mini
+    apiKey: ${OPENAI_API_KEY}
+
+agents:
+  - id: assistant
+    name: Assistant
+    alias: bot
+    provider: openai
+    systemPrompt: Help players with server questions.
+    tools: []
+    commandAllowlist: []
+    rateLimit:
+      rpm: 10
+      cooldown: 0
+    ingameMessageWindow: 10
+
+permissions:
+  survival:
+    players:
+      - name: Steve
+        agents: [assistant]
+        inGameAdmin: false
