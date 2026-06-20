@@ -1,6 +1,6 @@
 # ADR-LLD-004: Shared session key prefix `(serverId, agentId)` — multi-tenant by server
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-06-19
 - **Deciders**: Engineering (LLD pass)
 - **Tags**: data, sessions, multi-tenancy, engine-lib
@@ -27,7 +27,7 @@ The alternative interpretations are:
    personas and instructions; mixing them in one context window would
    confuse the model.
 3. **Per-(server, agent) sessions** — the SRS's chosen model. All players
-   + the operator share one session per `(serverId, agentId)` pair.
+   - the operator share one session per `(serverId, agentId)` pair.
 4. **Per-(server, agent, player) sessions** — per-player private sessions
    (option 1 rephrased). Rejected by SRS.
 
@@ -66,9 +66,11 @@ Each player gets a private session per agent. The `Session.id` is a fresh
 UUID per player.
 
 **Pros**:
+
 - Strongest privacy — players don't see each other's prompts.
 
 **Cons**:
+
 - Directly contradicts SRS §6.3 and HLD `04-data-model.md`.
 - Defeats the "group chat" use case — players can't see what other players
   asked the agent.
@@ -83,11 +85,13 @@ by `(serverId, agentId)`. If none exists, create one; if one exists,
 append to it.
 
 **Pros**:
+
 - Decouples the storage key (UUID) from the lookup key (composite).
 - Allows future "fork" or "archive" semantics (a session can be archived
   and a new one started for the same `(serverId, agentId)` pair).
 
 **Cons**:
+
 - Requires an extra index and a lookup-before-append on every mention.
 - The "active session" concept is implicit — the LLD has to define when
   a session becomes inactive (timeout? explicit `/clear`? never?).
@@ -114,19 +118,21 @@ in-memory handle and causes the next run to create a new suffixed session ID.
 Older persisted rows remain resumable by exact `sessionId`.
 
 **Pros**:
+
 - Direct implementation of SRS §6.3 and HLD `04-data-model.md`.
 - The composite ID is the lookup key — no extra index needed beyond
   engine-lib's default `(serverId, agentId)` index.
 - `tenantId = serverId` enables engine-lib's `tenantScopedStore` for
   defensive isolation.
 - The `Session` handle is stable — `createSession({id:
-  'survival:assistant:1760704496123-a1b2c3', store})` returns the same handle
+'survival:assistant:1760704496123-a1b2c3', store})` returns the same handle
   (after LRU eviction, re-opens the same row).
 - Forking (`Session.fork()`) creates a new session with a fresh UUID and
   a prefix of messages — useful for branching conversations without
   losing the original.
 
 **Cons**:
+
 - The composite ID is not a UUID — slightly unconventional. Mitigation:
   the format `^[a-zA-Z0-9_-]{1,32}:[a-zA-Z0-9_-]{1,32}:[0-9]{13}-[a-z0-9]{6}$`
   fits within engine-lib's `sessionId` string type and satisfies FR-SES-006.
@@ -181,6 +187,7 @@ use case without needing a custom mechanism.
 ## Consequences
 
 **Positive**:
+
 - Direct SRS §6.3 implementation.
 - engine-lib's `tenantScopedStore` gives free defensive isolation.
 - LRU cache is simple (exact suffixed session IDs are stable).
@@ -188,11 +195,13 @@ use case without needing a custom mechanism.
 - Forking is free (engine-lib built-in).
 
 **Negative**:
+
 - No "delete this session" operator command in v1. Mitigation: pruning
   job + manual DB intervention for edge cases.
 - Composite ID is not a UUID (minor — fits engine-lib's string type).
 
 **Neutral**:
+
 - The operator's `/chat assistant` on `survival` joins the same session
   as a player's `@assistant` mention on `survival`. This is the intended
   "group chat" behavior, but it means the operator sees player prompts
@@ -204,7 +213,7 @@ use case without needing a custom mechanism.
 - **No delete command** → The pruning job handles retention. For
   "delete now" use cases, the operator can `/clear` (in-memory) and wait
   for pruning, or manually `sqlite3 data/sessions.db "DELETE FROM
-  session_messages WHERE sessionId LIKE 'survival:assistant:%'"`. A
+session_messages WHERE sessionId LIKE 'survival:assistant:%'"`. A
   follow-up LLD may add `/delete-session` if operator demand warrants.
 - **Composite ID format** → Documented in `data-model.md` and validated at
   `createSession` time (regex `^[a-zA-Z0-9_-]{1,32}:[a-zA-Z0-9_-]{1,32}:[0-9]{13}-[a-z0-9]{6}$`).

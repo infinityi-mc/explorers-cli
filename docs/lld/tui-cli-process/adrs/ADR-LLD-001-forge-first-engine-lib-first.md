@@ -1,6 +1,6 @@
 # ADR-LLD-001: Forge-first / engine-lib-first design rule
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-06-19
 - **Deciders**: Engineering (LLD pass)
 - **Tags**: design-rule, infrastructure, dependencies
@@ -53,10 +53,12 @@ a custom token-bucket rate limiter, a custom path canonicalizer, a custom
 audit logger, etc.
 
 **Pros**:
+
 - Maximum control over every detail.
 - No dependency on the forge/engine-lib release cadence.
 
 **Cons**:
+
 - Massive duplication of effort — forge and engine-lib already ship these
   primitives, tested and documented.
 - Higher defect risk — re-implementations don't get the conformance
@@ -79,6 +81,7 @@ satisfies the capability. Only write host-owned code where no forge/engine-lib
 primitive covers the capability (and document the gap in an LLD ADR).
 
 **Pros**:
+
 - Leverages tested, documented, Bun-first primitives.
 - LLD is smaller and more reviewable — the LLD cites the forge/engine-lib
   API, doesn't re-derive it.
@@ -89,6 +92,7 @@ primitive covers the capability (and document the gap in an LLD ADR).
 - HLD ADRs are implemented by construction, not by re-derivation.
 
 **Cons**:
+
 - Tight coupling to forge/engine-lib release cadence — a breaking change in
   either library requires a host update.
 - Some host-owned glue is still needed (process lifecycle, PID registry,
@@ -181,6 +185,7 @@ These gaps are small and well-bounded.
 ## Consequences
 
 **Positive**:
+
 - The LLD is much smaller than Option 1 would produce — the design narrative
   cites the forge/engine-lib API rather than re-deriving it.
 - Implementation can start immediately from the LLD; the team reads the
@@ -192,6 +197,7 @@ These gaps are small and well-bounded.
   dependency version.
 
 **Negative**:
+
 - Tight coupling to forge/engine-lib release cadence.
 - The team must learn both libraries' API surfaces.
 - A breaking change in either library requires a host update (mitigated by
@@ -199,6 +205,7 @@ These gaps are small and well-bounded.
   respective `package.json` `exports` fields).
 
 **Neutral**:
+
 - The host-owned code is concentrated in 6 well-bounded areas (listed in
   the Decision section). Each has its own LLD section or ADR.
 

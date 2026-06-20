@@ -1,6 +1,6 @@
 # ADR-LLD-002: Process lifecycle is host-owned (no forge primitive covers it)
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-06-19
 - **Deciders**: Engineering (LLD pass)
 - **Tags**: process, lifecycle, os-specific, bun
@@ -62,10 +62,12 @@ Use a library like `tree-kill` (npm) to walk and kill descendant processes
 on both Windows and POSIX.
 
 **Pros**:
+
 - Single high-level API.
 - No native addon needed.
 
 **Cons**:
+
 - Adds a runtime dependency for core lifecycle safety (HLD ADR-003 Option
   B-3 explicitly rejected this — "Adds a dependency for core lifecycle
   safety").
@@ -83,10 +85,12 @@ Use command-line process termination primitives directly, without binding
 children to a manager-owned Job Object.
 
 **Pros**:
+
 - No native addon.
 - Simple implementation.
 
 **Cons**:
+
 - Doesn't bind Windows child lifetime to manager lifetime (HLD ADR-003
   Option B-2 explicitly rejected this — "Does not bind Windows child
   lifetime to the manager lifetime").
@@ -106,7 +110,7 @@ Implement per-OS process lifecycle in host code:
    Job Object via a native addon (or `ffi-napi`) call to
    `CreateJobObject` + `AssignProcessToJobObject` +
    `SetInformationJobObject(JobObjectExtendedLimitInformation,
-   JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE)`. When the manager process exits
+JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE)`. When the manager process exits
    (cleanly or crash), Windows automatically kills the Job Object's
    members.
 3. **`taskkill /T /F /PID <pid>`** — reserved for stale-PID recovery on
@@ -123,6 +127,7 @@ Implement per-OS process lifecycle in host code:
    fails, exit with `LOCK_HELD`.
 
 **Pros**:
+
 - Satisfies all driving requirements.
 - POSIX path is pure JS (no native addon).
 - Windows path uses the OS-native Job Object lifetime binding, which is
@@ -132,6 +137,7 @@ Implement per-OS process lifecycle in host code:
 - `data/pids.json` provides a recovery register for hard crashes.
 
 **Cons**:
+
 - Windows Job Object API requires a native addon (the only native code in
   the container).
 - Per-OS code paths increase test surface (need both POSIX and Windows
@@ -166,6 +172,7 @@ document the gap. This ADR is that documentation.
 ## Consequences
 
 **Positive**:
+
 - All HLD ADR-003 requirements satisfied.
 - POSIX path is pure JS — no native addon for Linux/macOS.
 - Windows Job Object lifetime binding is the strongest possible cleanup
@@ -173,10 +180,12 @@ document the gap. This ADR is that documentation.
 - `data/pids.json` provides a recovery register for the worst case.
 
 **Negative**:
+
 - One native addon for Windows Job Objects.
 - Per-OS code paths require both POSIX and Windows CI runners.
 
 **Neutral**:
+
 - The `taskkill` fallback is rarely used in practice (only after a hard
   crash), but it's the safety net for the case where the Job Object is
   gone.

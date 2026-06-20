@@ -50,16 +50,16 @@ satisfies it. LLD ADR-LLD-001 codifies this as a design rule.
 
 ## HLD linkage
 
-| HLD ADR | Decision | LLD constraint |
-|---|---|---|
-| `ADR-001` | REST + SSE for LLM provider comms | Use `engine-lib` provider adapters (`createOpenAI`/`createAnthropic`/`createGoogle`/`createOpenAICompatible`) which speak REST+SSE natively; do NOT write a hand-rolled SSE parser. |
-| `ADR-002` | SQLite WAL at `data/sessions.db` for session persistence | Use `engine-lib/session-stores`'s `createSqliteSessionStore` (built on `forge/data/dialects/sqlite`); do NOT hand-roll `bun:sqlite` tables. WAL pragma applied via the dialect driver. |
-| `ADR-003` | Native `Bun.spawn` + POSIX process groups / Windows Job Objects / `taskkill` fallback / `data/pids.json` | `Bun.spawn` is used directly (no forge/engine-lib primitive covers child-process lifecycle). PID registry and lock file are host-owned. Process-group / Job-Object wrappers are the ONLY non-library code in this container. |
-| `ADR-004` | Sandboxed path containment + token-prefix allowlisting for agent tools | Use `engine-lib/tools-fs` (`filesystemTools({allowedRoots:[server.path]})`) and `engine-lib/tools-shell` (`shellTools({allowedCwds:[server.path], policy:{allow:[...]}})`) — they already canonicalize paths, block symlinks outside roots, and enforce token-prefix command allowlists. Compose run-level policy via `composePolicies(shellPolicySource(...), filesystemPolicySource(...))`. Do NOT hand-roll the broker. |
-| `ADR-005` | Bounded log ingestion: 5000 lines/s + 16 MB scrollback per server | Use `forge/resilience/rate-limit` (`tokenBucketRateLimiter({capacity:5000, refillPerSec:5000})`) on the stdout reader; use a fixed-capacity ring buffer (`Array` with index modulo `maxBufferBytes`) for scrollback. The rate limiter is the only forge import; the ring buffer is trivial enough to write inline. |
-| `ADR-006` | Multi-step chat parser: regex → team-strip → name sanitize → alias lookup → case-insensitive perm check → rate-limit → context-window inject | Use `engine-lib/context` (`staticContext`/`dynamicContext`) for the N preceding chat lines injection; use `forge/resilience/rate-limit` `slidingWindowRateLimiter({limit:rpm, windowMs:60_000})` per `(playerId, agentId)` for `rpm`, plus a `Map<key, lastInvokedAt>` for cooldown. The regex pipeline itself is host-owned (no library covers it). |
-| `ADR-007` | Structured JSON logs at `logs/explorers-cli.log` (50 MB rotation), audit channel with redaction, opt-in telemetry, crash reports | Use `forge/telemetry` (`initTelemetry`, `createLog` with `stdout` exporter, `redact` middleware) for the app log; use `engine-lib/governance` (`auditSubscriber` + `jsonlAuditLog` or `forgeDataAuditLog`) for the audit trail; use `engine-lib/events` (`messageBusSubscriber` with `redaction:"digest"`) for telemetry fan-out. Crash reports are written by a `process.on('uncaughtException')` handler that runs the same redactor. |
-| `ADR-008` | Centralized runtime mode + configuration gateway (normal / `--read-only` / `--validate-config`) with hot-reload, last-known-good snapshot | Use `forge/config` (`defineConfig` with `t.*` schema, `defineDynamicConfig` + `pollingProvider` for hot-reload, `mockConfig` for tests). The runtime mode gate is a host-owned command classifier (`MutatingCommandClassifier`) that consumes the resolved mode and rejects mutating commands when `readOnly`. `validate-config` mode short-circuits `forge.boot` after `defineConfig` resolves. |
+| HLD ADR   | Decision                                                                                                                                     | LLD constraint                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ADR-001` | REST + SSE for LLM provider comms                                                                                                            | Use `engine-lib` provider adapters (`createOpenAI`/`createAnthropic`/`createGoogle`/`createOpenAICompatible`) which speak REST+SSE natively; do NOT write a hand-rolled SSE parser.                                                                                                                                                                                                                                                     |
+| `ADR-002` | SQLite WAL at `data/sessions.db` for session persistence                                                                                     | Use `engine-lib/session-stores`'s `createSqliteSessionStore` (built on `forge/data/dialects/sqlite`); do NOT hand-roll `bun:sqlite` tables. WAL pragma applied via the dialect driver.                                                                                                                                                                                                                                                  |
+| `ADR-003` | Native `Bun.spawn` + POSIX process groups / Windows Job Objects / `taskkill` fallback / `data/pids.json`                                     | `Bun.spawn` is used directly (no forge/engine-lib primitive covers child-process lifecycle). PID registry and lock file are host-owned. Process-group / Job-Object wrappers are the ONLY non-library code in this container.                                                                                                                                                                                                            |
+| `ADR-004` | Sandboxed path containment + token-prefix allowlisting for agent tools                                                                       | Use `engine-lib/tools-fs` (`filesystemTools({allowedRoots:[server.path]})`) and `engine-lib/tools-shell` (`shellTools({allowedCwds:[server.path], policy:{allow:[...]}})`) — they already canonicalize paths, block symlinks outside roots, and enforce token-prefix command allowlists. Compose run-level policy via `composePolicies(shellPolicySource(...), filesystemPolicySource(...))`. Do NOT hand-roll the broker.              |
+| `ADR-005` | Bounded log ingestion: 5000 lines/s + 16 MB scrollback per server                                                                            | Use `forge/resilience/rate-limit` (`tokenBucketRateLimiter({capacity:5000, refillPerSec:5000})`) on the stdout reader; use a fixed-capacity ring buffer (`Array` with index modulo `maxBufferBytes`) for scrollback. The rate limiter is the only forge import; the ring buffer is trivial enough to write inline.                                                                                                                      |
+| `ADR-006` | Multi-step chat parser: regex → team-strip → name sanitize → alias lookup → case-insensitive perm check → rate-limit → context-window inject | Use `engine-lib/context` (`staticContext`/`dynamicContext`) for the N preceding chat lines injection; use `forge/resilience/rate-limit` `slidingWindowRateLimiter({limit:rpm, windowMs:60_000})` per `(playerId, agentId)` for `rpm`, plus a `Map<key, lastInvokedAt>` for cooldown. The regex pipeline itself is host-owned (no library covers it).                                                                                    |
+| `ADR-007` | Structured JSON logs at `logs/explorers-cli.log` (50 MB rotation), audit channel with redaction, opt-in telemetry, crash reports             | Use `forge/telemetry` (`initTelemetry`, `createLog` with `stdout` exporter, `redact` middleware) for the app log; use `engine-lib/governance` (`auditSubscriber` + `jsonlAuditLog` or `forgeDataAuditLog`) for the audit trail; use `engine-lib/events` (`messageBusSubscriber` with `redaction:"digest"`) for telemetry fan-out. Crash reports are written by a `process.on('uncaughtException')` handler that runs the same redactor. |
+| `ADR-008` | Centralized runtime mode + configuration gateway (normal / `--read-only` / `--validate-config`) with hot-reload, last-known-good snapshot    | Use `forge/config` (`defineConfig` with `t.*` schema, `defineDynamicConfig` + `pollingProvider` for hot-reload, `mockConfig` for tests). The runtime mode gate is a host-owned command classifier (`MutatingCommandClassifier`) that consumes the resolved mode and rejects mutating commands when `readOnly`. `validate-config` mode short-circuits `forge.boot` after `defineConfig` resolves.                                        |
 
 ---
 
@@ -108,41 +108,41 @@ satisfies it. LLD ADR-LLD-001 codifies this as a design rule.
 The stack is **fully constrained by the SRS, HLD ADRs, and repo conventions**.
 No stack selection ADR is needed.
 
-| Layer | Choice | Source of truth |
-|---|---|---|
-| Runtime | Bun ≥ 1.3 | `package.json` `engines.bun` (forge peer), HLD `ADR-003` |
-| Language | TypeScript 6 strict, ESM | `package.json` `peerDependencies.typescript`, forge peer |
-| TUI framework | `@opentui/react` + `@opentui/core` | `package.json` `dependencies`, SRS §3.1 |
-| UI paradigm | React 19 (function components, hooks) | `package.json` `dependencies` |
-| Infra toolkit | `@infinityi/forge ^1.0.1` | `package.json` `dependencies`, HLD ADRs 002/005/007/008 |
-| Agent runtime | `@infinityi/engine-lib ^2.0.0` | `package.json` `dependencies`, HLD ADRs 001/004 |
-| Persistence | `bun:sqlite` (via `forge/data/dialects/sqlite`) | HLD `ADR-002`, SRS §6.3 |
-| Test runner | `bun:test` | forge/engine-lib convention, SRS §10 |
-| Distribution | `bun build --compile` single binary or npm package | HLD `06-deployment.md`, `ADR-003` |
+| Layer         | Choice                                             | Source of truth                                          |
+| ------------- | -------------------------------------------------- | -------------------------------------------------------- |
+| Runtime       | Bun ≥ 1.3                                          | `package.json` `engines.bun` (forge peer), HLD `ADR-003` |
+| Language      | TypeScript 6 strict, ESM                           | `package.json` `peerDependencies.typescript`, forge peer |
+| TUI framework | `@opentui/react` + `@opentui/core`                 | `package.json` `dependencies`, SRS §3.1                  |
+| UI paradigm   | React 19 (function components, hooks)              | `package.json` `dependencies`                            |
+| Infra toolkit | `@infinityi/forge ^1.0.1`                          | `package.json` `dependencies`, HLD ADRs 002/005/007/008  |
+| Agent runtime | `@infinityi/engine-lib ^2.0.0`                     | `package.json` `dependencies`, HLD ADRs 001/004          |
+| Persistence   | `bun:sqlite` (via `forge/data/dialects/sqlite`)    | HLD `ADR-002`, SRS §6.3                                  |
+| Test runner   | `bun:test`                                         | forge/engine-lib convention, SRS §10                     |
+| Distribution  | `bun build --compile` single binary or npm package | HLD `06-deployment.md`, `ADR-003`                        |
 
 ---
 
 ## File TOC
 
-| File | Purpose |
-|---|---|
-| `README.md` | This file. Entry point, HLD linkage, scope, assumptions. |
-| `design.md` | Component design narrative, forge/engine-lib capability mapping, key algorithms (pseudocode), concurrency model, external dependencies. |
-| `api.md` | Human-readable companion to `openapi.yaml`. Endpoint table, common patterns, versioning. |
-| `openapi.yaml` | OpenAPI 3.1 spec for the three interface surfaces (operator commands, in-game chat protocol, agent tool schemas). |
-| `data-model.md` | Logical ER for `data/sessions.db`, plus in-memory shapes for `config.yaml`, `data/pids.json`, `data/explorers.lock`. Indexes, constraints, access patterns. |
-| `migration-plan.md` | v1 greenfield migration for the session DB; cutover plan; rollback. |
-| `sequences.md` | 8 Mermaid sequence diagrams for critical flows (server start, server stop/crash, mention-trigger, manual `/chat`, hot-reload, tool sandboxing, idempotent `/start`, read-only reject). |
-| `domain.md` | Mermaid class diagram for `Server`, `Agent`, `Player`, `Session`, `Mention`, `Tool`, plus value objects and enums. |
-| `errors.md` | Error catalog (codes, mapping to internal exceptions, retry policy). |
-| `idempotency.md` | Per-mutating-operation idempotency rules (operator commands + tool executions). |
-| `observability.md` | Metrics, logs, traces, alerts. Implements `ADR-007`. |
-| `tests.md` | Unit / integration / contract / e2e strategy; must-not-break scenarios. |
-| `traceability.md` | FR/NFR × LLD-section matrix; orphan/out-of-scope requirements. |
-| `adrs/ADR-LLD-001-forge-first-engine-lib-first.md` | Codifies the forge-first / engine-lib-first design rule. |
-| `adrs/ADR-LLD-002-process-lifecycle-is-host-owned.md` | `Bun.spawn` + process groups / Job Objects / PID registry are the only non-library code; justifies why no forge primitive covers this. |
-| `adrs/ADR-LLD-003-runtime-mode-command-classifier.md` | The shared command router's mutating/non-mutating classification table for `--read-only` enforcement. |
-| `adrs/ADR-LLD-004-shared-session-key-multi-tenant.md` | One session per `(serverId, agentId)` shared by all players + operator; uses `engine-lib/session` tenant claim. |
+| File                                                  | Purpose                                                                                                                                                                                |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `README.md`                                           | This file. Entry point, HLD linkage, scope, assumptions.                                                                                                                               |
+| `design.md`                                           | Component design narrative, forge/engine-lib capability mapping, key algorithms (pseudocode), concurrency model, external dependencies.                                                |
+| `api.md`                                              | Human-readable companion to `openapi.yaml`. Endpoint table, common patterns, versioning.                                                                                               |
+| `openapi.yaml`                                        | OpenAPI 3.1 spec for the three interface surfaces (operator commands, in-game chat protocol, agent tool schemas).                                                                      |
+| `data-model.md`                                       | Logical ER for `data/sessions.db`, plus in-memory shapes for `config.yaml`, `data/pids.json`, `data/explorers.lock`. Indexes, constraints, access patterns.                            |
+| `migration-plan.md`                                   | v1 greenfield migration for the session DB; cutover plan; rollback.                                                                                                                    |
+| `sequences.md`                                        | 8 Mermaid sequence diagrams for critical flows (server start, server stop/crash, mention-trigger, manual `/chat`, hot-reload, tool sandboxing, idempotent `/start`, read-only reject). |
+| `domain.md`                                           | Mermaid class diagram for `Server`, `Agent`, `Player`, `Session`, `Mention`, `Tool`, plus value objects and enums.                                                                     |
+| `errors.md`                                           | Error catalog (codes, mapping to internal exceptions, retry policy).                                                                                                                   |
+| `idempotency.md`                                      | Per-mutating-operation idempotency rules (operator commands + tool executions).                                                                                                        |
+| `observability.md`                                    | Metrics, logs, traces, alerts. Implements `ADR-007`.                                                                                                                                   |
+| `tests.md`                                            | Unit / integration / contract / e2e strategy; must-not-break scenarios.                                                                                                                |
+| `traceability.md`                                     | FR/NFR × LLD-section matrix; orphan/out-of-scope requirements.                                                                                                                         |
+| `adrs/ADR-LLD-001-forge-first-engine-lib-first.md`    | Codifies the forge-first / engine-lib-first design rule.                                                                                                                               |
+| `adrs/ADR-LLD-002-process-lifecycle-is-host-owned.md` | `Bun.spawn` + process groups / Job Objects / PID registry are the only non-library code; justifies why no forge primitive covers this.                                                 |
+| `adrs/ADR-LLD-003-runtime-mode-command-classifier.md` | The shared command router's mutating/non-mutating classification table for `--read-only` enforcement.                                                                                  |
+| `adrs/ADR-LLD-004-shared-session-key-multi-tenant.md` | One session per `(serverId, agentId)` shared by all players + operator; uses `engine-lib/session` tenant claim.                                                                        |
 
 ---
 
@@ -172,7 +172,7 @@ Suggested reading order:
 
 - **Author**: Engineering (LLD pass)
 - **Date**: 2026-06-19
-- **Status**: Draft — ready for review
+- **Status**: Accepted
 - **HLD baseline**: `docs/hld/` as of 2026-06-19 (status: Ready for LLD)
 
 ---

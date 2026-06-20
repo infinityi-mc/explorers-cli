@@ -1,6 +1,6 @@
 # ADR-LLD-003: Runtime mode command classifier for `--read-only` enforcement
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-06-19
 - **Deciders**: Engineering (LLD pass)
 - **Tags**: security, runtime-mode, command-router, read-only
@@ -31,9 +31,10 @@ for read-only mode and cover it with tests") and the **classification
 mechanism**.
 
 The `--validate-config` mode is a terminal bootstrap path (load + validate
-+ exit) — it does not need a classifier. The classifier is only for
-distinguishing mutating from non-mutating commands in normal vs. read-only
-mode.
+
+- exit) — it does not need a classifier. The classifier is only for
+  distinguishing mutating from non-mutating commands in normal vs. read-only
+  mode.
 
 `forge/config` resolves the CLI flags at boot (via `cliSource` parsing
 `--read-only` / `--validate-config`). `forge/lifecycle`'s `boot` runs the
@@ -61,9 +62,11 @@ Each command handler checks `runtimeMode` at the top of its function and
 returns `READ_ONLY_BLOCKED` if mutating.
 
 **Pros**:
+
 - Simple to implement.
 
 **Cons**:
+
 - No single source of truth — easy to forget a check when adding a new
   command.
 - ADR-008 explicitly requires "a shared command classification model".
@@ -78,10 +81,12 @@ Mark each command handler with a `@mutating` decorator; the router reads
 the annotation and rejects if `runtimeMode === 'read-only'`.
 
 **Pros**:
+
 - Single declaration per command.
 - Hard to forget (the decorator is visible on the handler).
 
 **Cons**:
+
 - TypeScript decorators are an implementation detail — the LLD avoids
   implementation choices.
 - Doesn't handle commands whose mutating-ness depends on args (e.g.
@@ -127,6 +132,7 @@ The table is enumerable (a `Set`), so tests can iterate it and assert
 each entry is rejected in read-only mode.
 
 **Pros**:
+
 - Single source of truth — ADR-008's explicit requirement.
 - Enumerable — easy to test ("for each cmd in MUTATING_COMMANDS, assert
   rejected").
@@ -138,6 +144,7 @@ each entry is rejected in read-only mode.
   know about runtime mode.
 
 **Cons**:
+
 - A new mutating command that's accidentally omitted from the table would
   be allowed in read-only mode. Mitigation: the lint rule + test that
   asserts every command in the router's dispatch table is in either
@@ -188,16 +195,19 @@ that's accidentally omitted).
 ## Consequences
 
 **Positive**:
+
 - ADR-008's "explicit allow/deny table" requirement is satisfied by
   construction.
 - Single enforcement point — handlers don't repeat the check.
 - Enumerable for testing.
 
 **Negative**:
+
 - A new mutating command omitted from the table is silently allowed in
   read-only mode. Mitigated by the lint rule + test.
 
 **Neutral**:
+
 - The `send-stdin` command (raw stdin to MC server) is in
   `MUTATING_COMMANDS` even though it's not a slash-command — it's a TUI
   feature for power users. The classifier covers it because it flows
