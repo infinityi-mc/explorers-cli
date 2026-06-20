@@ -24,13 +24,13 @@
 
 ## Implementation Units
 
-| Unit ID | Type | Summary | Source | Risk |
-| ------- | ---- | ------- | ------ | ---- |
-| IU-025 | integration | Build provider registry, agent definitions, event hub subscribers, resilience pipeline, and provider error mapping. | `design.md` Agent Executor row | High |
-| IU-026 | data | Implement shared session lookup, tenant scoping, LRU handles, append/load/recent operations. | ADR-LLD-004 | High |
-| IU-027 | flow | Implement operator `/chat` online/offline, streaming tokens, timeout handling, and partial persistence. | `sequences.md` sections 4 and 4b | High |
-| IU-028 | contract | Complete `/session`, `/resume`, and `/clear` behavior against persisted session data. | `openapi.yaml` Session schemas | Medium |
-| IU-034 | test | Cover provider, session, and operator chat behavior. | `tests.md` Agent scenarios | High |
+| Unit ID | Type        | Summary                                                                                                             | Source                           | Risk   |
+| ------- | ----------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------ |
+| IU-025  | integration | Build provider registry, agent definitions, event hub subscribers, resilience pipeline, and provider error mapping. | `design.md` Agent Executor row   | High   |
+| IU-026  | data        | Implement shared session lookup, tenant scoping, LRU handles, append/load/recent operations.                        | ADR-LLD-004                      | High   |
+| IU-027  | flow        | Implement operator `/chat` online/offline, streaming tokens, timeout handling, and partial persistence.             | `sequences.md` sections 4 and 4b | High   |
+| IU-028  | contract    | Complete `/session`, `/resume`, and `/clear` behavior against persisted session data.                               | `openapi.yaml` Session schemas   | Medium |
+| IU-034  | test        | Cover provider, session, and operator chat behavior.                                                                | `tests.md` Agent scenarios       | High   |
 
 ## Work Items
 

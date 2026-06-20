@@ -28,7 +28,9 @@ export interface BootExplorersOptions {
   readonly shutdownTimeout?: number;
 }
 
-export async function bootExplorers(options: BootExplorersOptions): Promise<Application> {
+export async function bootExplorers(
+  options: BootExplorersOptions,
+): Promise<Application> {
   return boot({
     components: createFoundationComponents(options),
     logger: options.logger,
@@ -39,7 +41,9 @@ export async function bootExplorers(options: BootExplorersOptions): Promise<Appl
   } satisfies BootOptions);
 }
 
-export function createFoundationComponents(options: BootExplorersOptions): Component[] {
+export function createFoundationComponents(
+  options: BootExplorersOptions,
+): Component[] {
   let stopTui: StopTui | undefined;
 
   return [
@@ -63,7 +67,9 @@ export function createFoundationComponents(options: BootExplorersOptions): Compo
     asComponent(TOOLS_COMPONENT),
     asComponent("tui", {
       start: async () => {
-        stopTui = await options.startTui(createAppViewModel(options.loaded, options.runtime));
+        stopTui = await options.startTui(
+          createAppViewModel(options.loaded, options.runtime),
+        );
       },
       stop: async () => {
         stopTui?.();

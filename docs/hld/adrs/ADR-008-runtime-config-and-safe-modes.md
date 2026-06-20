@@ -2,7 +2,7 @@
 
 - **Status**: Proposed
 - **Date**: 2026-06-19
-- **Deciders**:  Principal Technical Lead
+- **Deciders**: Principal Technical Lead
 - **Tags**: configuration, reliability, security, cli, hot-reload
 
 ## Context
@@ -27,15 +27,15 @@ The SRS also requires a `--read-only` mode for kiosk or shared-host use. Althoug
 
 Let the CLI parser, Configuration Service, and TUI components independently decide how to handle `--read-only`, validation-only execution, and config deletion.
 
-* **Pros**:
-  * Keeps the HLD small.
-  * Leaves maximum flexibility to LLD authors.
-* **Cons**:
-  * Risks inconsistent behavior across command entry points.
-  * Does not establish an architectural home for SRS safe-mode and validation requirements.
-  * Makes it easy for read-only mode to disable `/chat` while still allowing direct console mutations.
-* **Satisfies**: None completely.
-* **Tensions**: `NFR-REL-007`, `NFR-SEC-009`, `NFR-MNT-003`.
+- **Pros**:
+  - Keeps the HLD small.
+  - Leaves maximum flexibility to LLD authors.
+- **Cons**:
+  - Risks inconsistent behavior across command entry points.
+  - Does not establish an architectural home for SRS safe-mode and validation requirements.
+  - Makes it easy for read-only mode to disable `/chat` while still allowing direct console mutations.
+- **Satisfies**: None completely.
+- **Tensions**: `NFR-REL-007`, `NFR-SEC-009`, `NFR-MNT-003`.
 
 ### Option 2: Centralized Runtime Mode and Configuration Gateway
 
@@ -47,15 +47,15 @@ Define a bootstrap/runtime gateway that owns process mode selection and config l
 
 The Configuration Service keeps the last known good configuration snapshot in memory. Hot-reload reads use an atomic-save tolerant retry window; invalid, missing, or deleted files leave the current runtime snapshot active and emit a TUI-visible warning.
 
-* **Pros**:
-  * Gives every mode and config lifecycle requirement a single architectural owner.
-  * Keeps running servers stable during config deletion or editor atomic-renames.
-  * Makes `--validate-config` safe for CI/CD and operator promotion flows.
-  * Gives read-only mode a consistent enforcement point across `/chat`, direct console input, restart/stop/start commands, and TUI config edits.
-* **Cons**:
-  * Requires a shared command router/mode guard instead of letting each UI widget invoke actions directly.
-* **Satisfies**: `FR-HOT-*`, `CFGIF-*`, `CMD-4`, `CMD-9`, `NFR-PERF-002`, `NFR-REL-007`, `NFR-SEC-009`, `NFR-MNT-003`.
-* **Tensions**: Read-only mode exceeds the minimum SRS wording by blocking all operator-initiated mutations, not just TUI chat. This is intentional for kiosk/shared-host safety; LLD may expose future narrower modes only with a new decision.
+- **Pros**:
+  - Gives every mode and config lifecycle requirement a single architectural owner.
+  - Keeps running servers stable during config deletion or editor atomic-renames.
+  - Makes `--validate-config` safe for CI/CD and operator promotion flows.
+  - Gives read-only mode a consistent enforcement point across `/chat`, direct console input, restart/stop/start commands, and TUI config edits.
+- **Cons**:
+  - Requires a shared command router/mode guard instead of letting each UI widget invoke actions directly.
+- **Satisfies**: `FR-HOT-*`, `CFGIF-*`, `CMD-4`, `CMD-9`, `NFR-PERF-002`, `NFR-REL-007`, `NFR-SEC-009`, `NFR-MNT-003`.
+- **Tensions**: Read-only mode exceeds the minimum SRS wording by blocking all operator-initiated mutations, not just TUI chat. This is intentional for kiosk/shared-host safety; LLD may expose future narrower modes only with a new decision.
 
 ## Decision
 
@@ -76,23 +76,26 @@ Centralizing config validation and publication also prevents reload race conditi
 ## Consequences
 
 **Positive**:
-* All config lifecycle and CLI safe-mode NFRs have one architectural owner.
-* Running servers are insulated from transient config file deletion and invalid hot-reloads.
-* Operators can validate config in CI or deployment scripts without side effects.
-* Read-only mode is enforced consistently across command entry points.
+
+- All config lifecycle and CLI safe-mode NFRs have one architectural owner.
+- Running servers are insulated from transient config file deletion and invalid hot-reloads.
+- Operators can validate config in CI or deployment scripts without side effects.
+- Read-only mode is enforced consistently across command entry points.
 
 **Negative**:
-* LLD must define a shared command classification model that distinguishes mutating from non-mutating actions.
-* Some users may expect `--read-only` to block only TUI chat; this design intentionally blocks broader mutations for safety.
+
+- LLD must define a shared command classification model that distinguishes mutating from non-mutating actions.
+- Some users may expect `--read-only` to block only TUI chat; this design intentionally blocks broader mutations for safety.
 
 **Neutral**:
-* In-game player-originated agent flows continue to use the existing player permission and rate-limit path. Read-only mode gates local operator actions, not remote player permissions.
+
+- In-game player-originated agent flows continue to use the existing player permission and rate-limit path. Read-only mode gates local operator actions, not remote player permissions.
 
 ## Mitigations for negative consequences
 
-* **Command classification ambiguity** → The command router LLD must maintain an explicit allow/deny table for read-only mode and cover it with tests.
-* **Operator confusion** → The TUI help text and startup banner must state that read-only mode is an observer/kiosk mode and list blocked commands.
-* **Hot-reload timing risk** → The Configuration Service LLD must set a 2-second budget for 10-server validation, including parser, schema validation, permission-index rebuild, and notification publication.
+- **Command classification ambiguity** → The command router LLD must maintain an explicit allow/deny table for read-only mode and cover it with tests.
+- **Operator confusion** → The TUI help text and startup banner must state that read-only mode is an observer/kiosk mode and list blocked commands.
+- **Hot-reload timing risk** → The Configuration Service LLD must set a 2-second budget for 10-server validation, including parser, schema validation, permission-index rebuild, and notification publication.
 
 ## Links
 

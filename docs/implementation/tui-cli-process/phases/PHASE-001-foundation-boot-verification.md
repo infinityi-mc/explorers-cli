@@ -24,14 +24,14 @@
 
 ## Implementation Units
 
-| Unit ID | Type | Summary | Source | Risk |
-| ------- | ---- | ------- | ------ | ---- |
-| IU-001 | delivery | Expand project scripts, dependency metadata, TypeScript strict checks, test command, and source layout. | `README.md` Stack inference; `package.json` | Medium |
-| IU-002 | delivery | Establish forge lifecycle boot, ordered startup/shutdown, signal handling, and validation-only short-circuit. | `design.md` Architecture and Concurrency model | Medium |
-| IU-003 | contract | Build runtime config schema, YAML adapter, env/secret resolution, and `--validate-config` diagnostics. | `design.md` Algorithm 4; ADR-LLD-003 | High |
-| IU-004 | contract | Replace starter OpenTUI app with TUI shell and view-model subscription seams. | `design.md` TUI View Engine mapping | Medium |
-| IU-005 | observability | Add structured log baseline, redaction, rotating file writer, telemetry null exporters, and crash report hook. | `observability.md` Logs and Redaction | High |
-| IU-034 | test | Establish unit and contract test harness used by later phases. | `tests.md` Test pyramid | Medium |
+| Unit ID | Type          | Summary                                                                                                        | Source                                         | Risk   |
+| ------- | ------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------ |
+| IU-001  | delivery      | Expand project scripts, dependency metadata, TypeScript strict checks, test command, and source layout.        | `README.md` Stack inference; `package.json`    | Medium |
+| IU-002  | delivery      | Establish forge lifecycle boot, ordered startup/shutdown, signal handling, and validation-only short-circuit.  | `design.md` Architecture and Concurrency model | Medium |
+| IU-003  | contract      | Build runtime config schema, YAML adapter, env/secret resolution, and `--validate-config` diagnostics.         | `design.md` Algorithm 4; ADR-LLD-003           | High   |
+| IU-004  | contract      | Replace starter OpenTUI app with TUI shell and view-model subscription seams.                                  | `design.md` TUI View Engine mapping            | Medium |
+| IU-005  | observability | Add structured log baseline, redaction, rotating file writer, telemetry null exporters, and crash report hook. | `observability.md` Logs and Redaction          | High   |
+| IU-034  | test          | Establish unit and contract test harness used by later phases.                                                 | `tests.md` Test pyramid                        | Medium |
 
 ## Work Items
 

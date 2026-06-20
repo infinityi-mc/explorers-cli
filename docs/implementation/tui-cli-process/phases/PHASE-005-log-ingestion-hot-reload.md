@@ -23,13 +23,13 @@
 
 ## Implementation Units
 
-| Unit ID | Type | Summary | Source | Risk |
-| ------- | ---- | ------- | ------ | ---- |
-| IU-018 | flow | Add bounded log reader with forge token bucket, 16 MB ring buffer, dropped/evicted counters, and scrollback updates. | `design.md` Algorithm 3 | Medium |
-| IU-019 | flow | Render server status, scrollback, dropped counts, hot-reload banners, and pending restart markers in the TUI. | `observability.md` Dashboard | Medium |
-| IU-020 | reliability | Implement hot-reload debounce, validation, last-known-good retention, diff, and atomic publish. | `design.md` Algorithm 4 | High |
-| IU-021 | security | Rebuild permission, agent, provider, and tool policy indexes on valid hot-reload. | `design.md` Caching | Medium |
-| IU-034 | test | Cover log flood, buffer cap, and hot-reload rejection. | `tests.md` Reliability and Performance | High |
+| Unit ID | Type        | Summary                                                                                                              | Source                                 | Risk   |
+| ------- | ----------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------ |
+| IU-018  | flow        | Add bounded log reader with forge token bucket, 16 MB ring buffer, dropped/evicted counters, and scrollback updates. | `design.md` Algorithm 3                | Medium |
+| IU-019  | flow        | Render server status, scrollback, dropped counts, hot-reload banners, and pending restart markers in the TUI.        | `observability.md` Dashboard           | Medium |
+| IU-020  | reliability | Implement hot-reload debounce, validation, last-known-good retention, diff, and atomic publish.                      | `design.md` Algorithm 4                | High   |
+| IU-021  | security    | Rebuild permission, agent, provider, and tool policy indexes on valid hot-reload.                                    | `design.md` Caching                    | Medium |
+| IU-034  | test        | Cover log flood, buffer cap, and hot-reload rejection.                                                               | `tests.md` Reliability and Performance | High   |
 
 ## Work Items
 

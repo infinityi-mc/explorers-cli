@@ -45,16 +45,16 @@ tools-shell + tools-fs), ADR-006 (chat parser + permissions), ADR-008
 
 ### Operator commands (`/operator/*`)
 
-| Method | Path | operationId | Summary | Auth | Idempotent? | Read-only? |
-|---|---|---|---|---|---|---|
-| POST | /operator/start | operatorStart | Start a server | operator (local) | yes (5 s window) | blocked |
-| POST | /operator/stop | operatorStop | Stop a server | operator | yes (per-state) | blocked |
-| POST | /operator/restart | operatorRestart | Stop + start | operator | yes (per-phase) | blocked |
-| POST | /operator/chat | operatorChat | Chat with an agent | operator | yes (5 s window) | blocked |
-| GET | /operator/session | operatorSessionList | List sessions | operator | n/a (GET) | **allowed** |
-| POST | /operator/resume | operatorResume | Load session history into TUI | operator | n/a (read-only op) | **allowed** |
-| POST | /operator/clear | operatorClear | Drop in-memory session handle | operator | yes (5 s window) | blocked |
-| GET | /operator/help | operatorHelp | List commands | operator | n/a (GET) | **allowed** |
+| Method | Path              | operationId         | Summary                       | Auth             | Idempotent?        | Read-only?  |
+| ------ | ----------------- | ------------------- | ----------------------------- | ---------------- | ------------------ | ----------- |
+| POST   | /operator/start   | operatorStart       | Start a server                | operator (local) | yes (5 s window)   | blocked     |
+| POST   | /operator/stop    | operatorStop        | Stop a server                 | operator         | yes (per-state)    | blocked     |
+| POST   | /operator/restart | operatorRestart     | Stop + start                  | operator         | yes (per-phase)    | blocked     |
+| POST   | /operator/chat    | operatorChat        | Chat with an agent            | operator         | yes (5 s window)   | blocked     |
+| GET    | /operator/session | operatorSessionList | List sessions                 | operator         | n/a (GET)          | **allowed** |
+| POST   | /operator/resume  | operatorResume      | Load session history into TUI | operator         | n/a (read-only op) | **allowed** |
+| POST   | /operator/clear   | operatorClear       | Drop in-memory session handle | operator         | yes (5 s window)   | blocked     |
+| GET    | /operator/help    | operatorHelp        | List commands                 | operator         | n/a (GET)          | **allowed** |
 
 "Auth" is the local operator (no per-operator authentication in v1 — the OS
 account is the trust boundary, per ADR-008). "Read-only?" indicates whether
@@ -62,10 +62,10 @@ the command is allowed when the manager was started with `--read-only`.
 
 ### In-game chat interface (`/ingame/*`)
 
-| Method | Path | operationId | Summary | Caller |
-|---|---|---|---|---|
-| POST | /ingame/chat | ingameChatLine | Parsed chat line from Minecraft stdout | Chat Parser (internal emitter) |
-| POST | /ingame/tellraw | ingameTellraw | `/tellraw` stdin write to Minecraft server | Agent Executor (internal) |
+| Method | Path            | operationId    | Summary                                    | Caller                         |
+| ------ | --------------- | -------------- | ------------------------------------------ | ------------------------------ |
+| POST   | /ingame/chat    | ingameChatLine | Parsed chat line from Minecraft stdout     | Chat Parser (internal emitter) |
+| POST   | /ingame/tellraw | ingameTellraw  | `/tellraw` stdin write to Minecraft server | Agent Executor (internal)      |
 
 The `ingame/chat` endpoint is **not invoked over HTTP** — it's the contract
 for the parsed shape emitted by the Chat Parser. The `ingame/tellraw` endpoint
@@ -73,11 +73,11 @@ is the contract for stdin writes the Agent Executor emits; again, not HTTP.
 
 ### Agent tools (`/agent-tools/*`)
 
-| Method | Path | operationId | Summary | Provided by |
-|---|---|---|---|---|
-| POST | /agent-tools/run_command | agentRunCommand | Execute a Minecraft console command | `engine-lib/tools-shell` `shellTools().runCommand` |
-| POST | /agent-tools/read_file | agentReadFile | Read a file inside the server sandbox | `engine-lib/tools-fs` `filesystemTools().read` |
-| POST | /agent-tools/write_file | agentWriteFile | Write a file inside the server sandbox | `engine-lib/tools-fs` `filesystemTools().writeFile` |
+| Method | Path                     | operationId     | Summary                                | Provided by                                         |
+| ------ | ------------------------ | --------------- | -------------------------------------- | --------------------------------------------------- |
+| POST   | /agent-tools/run_command | agentRunCommand | Execute a Minecraft console command    | `engine-lib/tools-shell` `shellTools().runCommand`  |
+| POST   | /agent-tools/read_file   | agentReadFile   | Read a file inside the server sandbox  | `engine-lib/tools-fs` `filesystemTools().read`      |
+| POST   | /agent-tools/write_file  | agentWriteFile  | Write a file inside the server sandbox | `engine-lib/tools-fs` `filesystemTools().writeFile` |
 
 These are JSON-Schema tool definitions advertised to the LLM provider. The
 "endpoint" framing in the OpenAPI spec is for contract-test convenience —

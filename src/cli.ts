@@ -25,7 +25,9 @@ export interface RunCliOptions {
   readonly logDir?: string;
 }
 
-export async function runCli(options: RunCliOptions = {}): Promise<RunCliResult> {
+export async function runCli(
+  options: RunCliOptions = {},
+): Promise<RunCliResult> {
   const argv = options.argv ?? process.argv.slice(2);
   const runtime = parseRuntimeOptions(argv);
   if (!runtime.ok) return fail(runtime.diagnostics, options.stderr);
@@ -80,13 +82,17 @@ export async function runCli(options: RunCliOptions = {}): Promise<RunCliResult>
   } catch (error) {
     disposeCrashReporter();
     await telemetry.shutdown();
-    options.stderr?.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    options.stderr?.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    );
     return { kind: "exit", code: 1 };
   }
 }
 
 function fail(
-  diagnostics: readonly Parameters<typeof formatRuntimeConfigDiagnostics>[0][number][],
+  diagnostics: readonly Parameters<
+    typeof formatRuntimeConfigDiagnostics
+  >[0][number][],
   stderr: Pick<NodeJS.WriteStream, "write"> | undefined,
 ): RunCliResult {
   stderr?.write(formatRuntimeConfigDiagnostics(diagnostics));

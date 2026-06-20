@@ -2,9 +2,9 @@ import type { ConfigSource } from "@infinityi/forge/config";
 import { parse } from "yaml";
 import { configIssue, type Result } from "./diagnostics";
 
-export async function readYamlConfig(path: string): Promise<
-  Result<{ readonly value: unknown; readonly existed: boolean }>
-> {
+export async function readYamlConfig(
+  path: string,
+): Promise<Result<{ readonly value: unknown; readonly existed: boolean }>> {
   const file = Bun.file(path);
   if (!(await file.exists())) {
     return { ok: true, value: { value: {}, existed: false } };
@@ -43,7 +43,9 @@ export function yamlConfigSource(root: unknown): ConfigSource {
   };
 }
 
-export function envConfigSource(env: Readonly<Record<string, string | undefined>>): ConfigSource {
+export function envConfigSource(
+  env: Readonly<Record<string, string | undefined>>,
+): ConfigSource {
   return {
     name: "env",
     get({ envVar }) {
@@ -65,7 +67,11 @@ function readPath(root: unknown, path: string): unknown {
 function sourceValue(value: unknown): string | undefined {
   if (value === undefined) return undefined;
   if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean" || value === null) {
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value === null
+  ) {
     return String(value);
   }
   return JSON.stringify(value);

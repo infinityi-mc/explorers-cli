@@ -125,17 +125,18 @@ The session metadata table. Created and migrated by
 NOT write to it directly; the `Session` handle from `createSession({id, store})`
 abstracts it.
 
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `sessionId` | varchar | PK | Composite key `serverId:agentId:<timestamp>-<randomSuffix>` per ADR-LLD-004 and FR-SES-006 |
-| `serverId` | varchar | FK → servers.id (logical), NOT NULL | engine-lib uses this as the `tenantId` for tenant scoping |
-| `agentId` | varchar | NOT NULL | |
-| `tenantId` | varchar | NOT NULL | engine-lib tenant claim; equals `serverId` |
-| `createdAt` | timestamptz | NOT NULL, default `now()` | engine-lib owned |
-| `updatedAt` | timestamptz | NOT NULL | engine-lib owned; updated on every append |
-| `version` | int | NOT NULL, default 1 | engine-lib CAS counter (opt-in via `appendIfVersion`) |
+| Column      | Type        | Constraints                         | Notes                                                                                      |
+| ----------- | ----------- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| `sessionId` | varchar     | PK                                  | Composite key `serverId:agentId:<timestamp>-<randomSuffix>` per ADR-LLD-004 and FR-SES-006 |
+| `serverId`  | varchar     | FK → servers.id (logical), NOT NULL | engine-lib uses this as the `tenantId` for tenant scoping                                  |
+| `agentId`   | varchar     | NOT NULL                            |                                                                                            |
+| `tenantId`  | varchar     | NOT NULL                            | engine-lib tenant claim; equals `serverId`                                                 |
+| `createdAt` | timestamptz | NOT NULL, default `now()`           | engine-lib owned                                                                           |
+| `updatedAt` | timestamptz | NOT NULL                            | engine-lib owned; updated on every append                                                  |
+| `version`   | int         | NOT NULL, default 1                 | engine-lib CAS counter (opt-in via `appendIfVersion`)                                      |
 
 **Indexes** (engine-lib owned, satisfy NFR-PERF-006):
+
 - `idx_sessions_server_agent` on `(serverId, agentId)` — for context fetch by composite key
 - `idx_sessions_timestamp` on `(createdAt)` — for pruning scans
 - `idx_sessions_sessionId` on `(sessionId)` — for `/resume` lookups
@@ -144,6 +145,7 @@ abstracts it.
 indefinitely; rows pruned when their messages exceed retention.
 
 **Access patterns**:
+
 - Lookup by `sessionId` (primary key) — 95% of reads (engine-lib `SessionStore.load`)
 - List by `(serverId, agentId)` — `/session` operator command
 - List by `createdAt` ordered — pruning scan
@@ -157,16 +159,17 @@ The message rows. Each row is one `Message` from the engine-lib
 `messages` module. engine-lib's store appends rows via
 `SessionStore.append(id, messages)`.
 
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `rowid` | bigint | PK, autoincrement | SQLite implicit PK |
-| `sessionId` | varchar | FK → sessions.sessionId, NOT NULL | Indexed |
-| `role` | varchar | NOT NULL, CHECK in (`user`, `assistant`, `system`, `tool`) | |
-| `content` | text | NOT NULL | Verbatim message text; tool results are JSON-serialized |
-| `timestamp` | timestamptz | NOT NULL, default `now()` | engine-lib owned |
-| `playerContext` | jsonb | NOT NULL, default `{}` | Extensible object per FR-SES-007/008. For `user` rows, includes `{playerName}` where playerName is the vanilla name or `operator`; assistant/system/tool rows may store `{}`. |
+| Column          | Type        | Constraints                                                | Notes                                                                                                                                                                         |
+| --------------- | ----------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rowid`         | bigint      | PK, autoincrement                                          | SQLite implicit PK                                                                                                                                                            |
+| `sessionId`     | varchar     | FK → sessions.sessionId, NOT NULL                          | Indexed                                                                                                                                                                       |
+| `role`          | varchar     | NOT NULL, CHECK in (`user`, `assistant`, `system`, `tool`) |                                                                                                                                                                               |
+| `content`       | text        | NOT NULL                                                   | Verbatim message text; tool results are JSON-serialized                                                                                                                       |
+| `timestamp`     | timestamptz | NOT NULL, default `now()`                                  | engine-lib owned                                                                                                                                                              |
+| `playerContext` | jsonb       | NOT NULL, default `{}`                                     | Extensible object per FR-SES-007/008. For `user` rows, includes `{playerName}` where playerName is the vanilla name or `operator`; assistant/system/tool rows may store `{}`. |
 
 **Indexes** (engine-lib owned, satisfy NFR-PERF-006):
+
 - `idx_session_messages_session_ts` on `(sessionId, timestamp DESC)` — for
   "fetch last N messages in this session" (FR-SES-004)
 - `idx_session_messages_timestamp` on `(timestamp)` — for retention pruning
@@ -175,6 +178,7 @@ The message rows. Each row is one `Message` from the engine-lib
 (NFR-CAP-002). With 50 sessions, max ~500,000 rows.
 
 **Access patterns**:
+
 - Append (write) — every chat turn
 - Fetch last N by `(sessionId, timestamp DESC)` — every agent invocation
   (FR-CHAT-011 / `ingameMessageWindow`)
@@ -189,20 +193,21 @@ Append-only audit trail. Written by the `engine-lib/governance`
 `AuditEntry`s). The table is created by `forgeDataAuditLog({db, table:
 'audit_entries'}).migrate()` at boot.
 
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `id` | uuid | PK, default `gen_random_uuid()` | |
-| `occurredAt` | timestamptz | NOT NULL, default `now()` | |
-| `serverId` | varchar | NOT NULL | `'system'` for manager-level events (boot, hot-reload, crash) |
-| `agentId` | varchar | NOT NULL | `'system'` for non-agent events |
-| `playerName` | varchar | NULL | Vanilla name for in-game triggers; `'operator'` for operator actions; NULL for system events |
-| `actionType` | varchar | NOT NULL, CHECK in (`command_exec`, `file_read`, `file_write`, `mention_authorized`, `mention_denied`, `tellraw_sent`, `say_fallback`, `tellraw_skipped`, `start`, `stop`, `restart`, `hot_reload`, `crash`, `provider_timeout`, `stdin_closed`) | |
-| `target` | varchar | NOT NULL | Command text, file path, or mention line. Redacted by `redactTextForPersistence` before storage. |
-| `outcome` | varchar | NOT NULL, CHECK in (`ok`, `blocked`, `failed`) | |
-| `detail` | text | NULL | Redacted free-text context |
-| `argumentsDigest` | varchar | NULL | FNV-1a hash of structured args (no raw args persisted) |
+| Column            | Type        | Constraints                                                                                                                                                                                                                                      | Notes                                                                                            |
+| ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `id`              | uuid        | PK, default `gen_random_uuid()`                                                                                                                                                                                                                  |                                                                                                  |
+| `occurredAt`      | timestamptz | NOT NULL, default `now()`                                                                                                                                                                                                                        |                                                                                                  |
+| `serverId`        | varchar     | NOT NULL                                                                                                                                                                                                                                         | `'system'` for manager-level events (boot, hot-reload, crash)                                    |
+| `agentId`         | varchar     | NOT NULL                                                                                                                                                                                                                                         | `'system'` for non-agent events                                                                  |
+| `playerName`      | varchar     | NULL                                                                                                                                                                                                                                             | Vanilla name for in-game triggers; `'operator'` for operator actions; NULL for system events     |
+| `actionType`      | varchar     | NOT NULL, CHECK in (`command_exec`, `file_read`, `file_write`, `mention_authorized`, `mention_denied`, `tellraw_sent`, `say_fallback`, `tellraw_skipped`, `start`, `stop`, `restart`, `hot_reload`, `crash`, `provider_timeout`, `stdin_closed`) |                                                                                                  |
+| `target`          | varchar     | NOT NULL                                                                                                                                                                                                                                         | Command text, file path, or mention line. Redacted by `redactTextForPersistence` before storage. |
+| `outcome`         | varchar     | NOT NULL, CHECK in (`ok`, `blocked`, `failed`)                                                                                                                                                                                                   |                                                                                                  |
+| `detail`          | text        | NULL                                                                                                                                                                                                                                             | Redacted free-text context                                                                       |
+| `argumentsDigest` | varchar     | NULL                                                                                                                                                                                                                                             | FNV-1a hash of structured args (no raw args persisted)                                           |
 
 **Indexes**:
+
 - `idx_audit_entries_occurredAt` on `(occurredAt DESC)` — for "show recent
   audit events" in the TUI audit panel
 - `idx_audit_entries_server_agent` on `(serverId, agentId, occurredAt DESC)`
@@ -217,6 +222,7 @@ call per minute per agent), ~50 rows/min = ~72,000 rows/day. Retained
 indefinitely; operator can manually truncate.
 
 **Access patterns**:
+
 - Append (write) — every audit-worthy event
 - Range scan by `occurredAt DESC LIMIT N` — TUI audit panel
 - Range scan by `(serverId, agentId, occurredAt DESC)` — per-server drill-down
@@ -231,17 +237,18 @@ migrator).
 Tracks the last pruning pass per session, so the 24-hour prune job
 (ADR-002 mitigation) doesn't re-scan the full table.
 
-| Column | Type | Constraints | Notes |
-|---|---|---|---|
-| `sessionId` | varchar | PK, FK → sessions.sessionId (ON DELETE CASCADE) | |
-| `lastPrunedAt` | timestamptz | NOT NULL, default `now()` | |
-| `messageCountAtPrune` | int | NOT NULL | For rate-limiting future prunes if the session is quiet |
+| Column                | Type        | Constraints                                     | Notes                                                   |
+| --------------------- | ----------- | ----------------------------------------------- | ------------------------------------------------------- |
+| `sessionId`           | varchar     | PK, FK → sessions.sessionId (ON DELETE CASCADE) |                                                         |
+| `lastPrunedAt`        | timestamptz | NOT NULL, default `now()`                       |                                                         |
+| `messageCountAtPrune` | int         | NOT NULL                                        | For rate-limiting future prunes if the session is quiet |
 
 **Indexes**: PK only (the table is small — ≤ 50 rows).
 
 **Volume estimate**: one row per active session (≤ 50).
 
 **Access patterns**:
+
 - Upsert by `sessionId` — at the end of each pruning pass
 - Range scan `WHERE lastPrunedAt < now() - 24h` — to find sessions needing a prune
 
@@ -282,15 +289,16 @@ owns the file.
 }
 ```
 
-| Field | Type | Notes |
-|---|---|---|
-| `<serverId>` | int | OS process ID of the spawned Java child |
+| Field        | Type | Notes                                   |
+| ------------ | ---- | --------------------------------------- |
+| `<serverId>` | int  | OS process ID of the spawned Java child |
 
 **Lifecycle**: atomically rewritten (write-to-temp + rename) on every spawn
 and every stop. On boot, the Lock & Lockout Service reads this file and
 kills stale PIDs before the rest of the manager starts (NFR-REL-002).
 
 **Access patterns**:
+
 - Read at boot — stale-PID cleanup
 - Read on `forceKillChildTree` — emergency fallback
 - Write on `Bun.spawn` success — record PID immediately (NFR-REL-003)
@@ -300,15 +308,15 @@ kills stale PIDs before the rest of the manager starts (NFR-REL-002).
 
 The runtime state of a single server. Per SRS §6.2.
 
-| Field | Type | Notes |
-|---|---|---|
-| `serverId` | ServerId | Primary key |
-| `status` | enum | `STOPPED`/`STARTING`/`RUNNING`/`STOPPING`/`FAILED` |
-| `pid` | int \| null | OS process ID; null when `STOPPED` or `FAILED` |
-| `startTime` | timestamptz \| null | Set when transition `STARTING → RUNNING` |
+| Field                 | Type                | Notes                                                          |
+| --------------------- | ------------------- | -------------------------------------------------------------- |
+| `serverId`            | ServerId            | Primary key                                                    |
+| `status`              | enum                | `STOPPED`/`STARTING`/`RUNNING`/`STOPPING`/`FAILED`             |
+| `pid`                 | int \| null         | OS process ID; null when `STOPPED` or `FAILED`                 |
+| `startTime`           | timestamptz \| null | Set when transition `STARTING → RUNNING`                       |
 | `lastSuccessfulStart` | timestamptz \| null | Most recent `STARTING → RUNNING` transition; survives restarts |
-| `restartCount` | int | Increments on each `/restart` invocation |
-| `lastError` | string \| null | Cleared on successful restart (FR-SRV-016) |
+| `restartCount`        | int                 | Increments on each `/restart` invocation                       |
+| `lastError`           | string \| null      | Cleared on successful restart (FR-SRV-016)                     |
 
 **Lifecycle**: Held in-memory by the Server Process Manager. Not persisted;
 the PID registry captures the recovery pointer, and per-server runtime state
@@ -325,7 +333,7 @@ fails, the manager exits with a clear error message (FR-SRV-020 / AC-035).
 ## Cross-cutting notes
 
 - **All timestamps** are `timestamptz` (UTC storage). No `timestamp without
-  time zone` — that's a footgun.
+time zone` — that's a footgun.
 - **All UUIDs** use `gen_random_uuid()` (SQLite's `lower(hex(randomblob(16)))`
   equivalent — the dialect driver handles this).
 - **All string IDs** (`serverId`, `agentId`, `providerName`) match

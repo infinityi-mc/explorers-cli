@@ -2,7 +2,7 @@
 
 - **Status**: Proposed
 - **Date**: 2026-06-19
-- **Deciders**:  Principal Technical Lead
+- **Deciders**: Principal Technical Lead
 - **Tags**: security, chat, permissions, parser
 
 ## Context

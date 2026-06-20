@@ -76,6 +76,7 @@ sequenceDiagram
 ```
 
 **Notes**:
+
 - The PID is recorded in `pids.json` **before** the startup timeout timer is
   set, so a crash during startup still leaves a recoverable PID entry
   (NFR-REL-002).
@@ -116,6 +117,7 @@ sequenceDiagram
 ```
 
 **Notes**:
+
 - The state transition happens **before** the audit write, so even if the
   audit write fails (e.g. disk full), the TUI still shows the crash.
 - `Log.detach` stops the `for await` loop on `child.stdout`; the stream is
@@ -197,6 +199,7 @@ sequenceDiagram
 ```
 
 **Notes**:
+
 - The session key prefix is `serverId:agentId` with a timestamp+random suffix
   (ADR-LLD-004) — all players on `survival` who mention `@assistant` share
   the same active context window.
@@ -265,6 +268,7 @@ sequenceDiagram
 ```
 
 **Notes**:
+
 - The `AbortController` is the same one passed to `fetch` via
   `engine-lib/providers`' `openSseStream` — aborting actually closes the
   socket (FR-INV-003).
@@ -378,6 +382,7 @@ sequenceDiagram
 ```
 
 **Notes**:
+
 - The 200 ms debounce coalesces editor atomic-save (write-to-temp + rename)
   which fires two file events.
 - The validation runs the **same** schema used at boot, so a hot-reload can
@@ -439,6 +444,7 @@ sequenceDiagram
 ```
 
 **Notes**:
+
 - The `tools-shell` policy check happens **inside** the engine-lib run loop,
   before the tool's `execute` function is called. The host code does not
   need to wrap the tool — `shellTools({policy})` configures it once at
@@ -490,6 +496,7 @@ sequenceDiagram
 ```
 
 **Notes**:
+
 - The idempotency cache is in-process (`Map<hash, {response, expiresAt}>`),
   not in the DB. Rationale: operator commands are interactive; a 5 s window
   covers accidental double-Enter without persisting state. See
@@ -541,6 +548,7 @@ sequenceDiagram
 ```
 
 **Notes**:
+
 - The classification table is the one defined in ADR-LLD-003:
   `MUTATING_COMMANDS = {start, stop, restart, chat, send-stdin, clear-session, config-edit}`.
 - The rejection happens **before** the Server Process Manager is reached, so

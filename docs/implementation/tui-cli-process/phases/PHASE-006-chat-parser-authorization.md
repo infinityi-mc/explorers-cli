@@ -22,12 +22,12 @@
 
 ## Implementation Units
 
-| Unit ID | Type | Summary | Source | Risk |
-| ------- | ---- | ------- | ------ | ---- |
-| IU-022 | domain | Implement vanilla chat regex, team strip, player-name sanitization, first `@alias`, and help trigger. | `design.md` Algorithm 1 | Medium |
-| IU-023 | security | Enforce deny-by-default authorization, case-insensitive lookup, rpm limiter, and cooldown. | `design.md` Algorithm 1 | High |
-| IU-024 | observability | Emit mention authorized/denied/help audit, metrics, and redacted logs. | `observability.md` Chat parser metrics | Medium |
-| IU-034 | test | Cover chat parser and authorization branches. | `tests.md` Security scenarios | High |
+| Unit ID | Type          | Summary                                                                                               | Source                                 | Risk   |
+| ------- | ------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------- | ------ |
+| IU-022  | domain        | Implement vanilla chat regex, team strip, player-name sanitization, first `@alias`, and help trigger. | `design.md` Algorithm 1                | Medium |
+| IU-023  | security      | Enforce deny-by-default authorization, case-insensitive lookup, rpm limiter, and cooldown.            | `design.md` Algorithm 1                | High   |
+| IU-024  | observability | Emit mention authorized/denied/help audit, metrics, and redacted logs.                                | `observability.md` Chat parser metrics | Medium |
+| IU-034  | test          | Cover chat parser and authorization branches.                                                         | `tests.md` Security scenarios          | High   |
 
 ## Work Items
 

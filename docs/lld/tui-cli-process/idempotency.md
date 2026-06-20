@@ -135,17 +135,18 @@ storage" below for the trade-offs.
 
 The in-process `Map<hash, {response, expiresAt}>`:
 
-| Field | Type | Notes |
-|---|---|---|
-| `hash` | string (sha256 hex) | PK |
-| `response` | `StartServerResponse \| StopServerResponse \| AgentRunResponse \| ...` | The cached response |
-| `expiresAt` | `number` (epoch ms) | `now() + 5000` |
+| Field       | Type                                                                   | Notes               |
+| ----------- | ---------------------------------------------------------------------- | ------------------- |
+| `hash`      | string (sha256 hex)                                                    | PK                  |
+| `response`  | `StartServerResponse \| StopServerResponse \| AgentRunResponse \| ...` | The cached response |
+| `expiresAt` | `number` (epoch ms)                                                    | `now() + 5000`      |
 
 **Eviction**: lazy on lookup. A periodic sweep (every 60 s) removes expired
 entries to bound memory. Worst-case size: ~10 entries (one per server) ×
 5 s window = trivial.
 
 **Why not DB-backed?**
+
 - The manager is single-process; no cross-process replay is possible.
 - The 5 s window is shorter than any plausible network-retry storm.
 - A DB-backed store would add a write to `sessions.db` on every operator
@@ -155,6 +156,7 @@ entries to bound memory. Worst-case size: ~10 entries (one per server) ×
   interactive terminal tool (the operator is present to observe).
 
 **Why not Redis/external?**
+
 - The manager is single-host; no external cache is justified.
 - HLD §02 explicitly says "No Redis, no Kafka, no external cache."
 
@@ -170,7 +172,7 @@ entries to bound memory. Worst-case size: ~10 entries (one per server) ×
   mask legitimate retries.
 - **Don't apply operator-command idempotency to in-game mentions.** Player
   mentions are rate-limited separately (per-(player, agent) sliding window
-  + cooldown). Adding idempotency on top would double-suppress legitimate
-  retried mentions after a transient failure.
+  - cooldown). Adding idempotency on top would double-suppress legitimate
+    retried mentions after a transient failure.
 - **Don't dedup `read_file` across runs.** The file may have changed. The
   engine-lib run-loop dedup within a single `runAgent` is sufficient.

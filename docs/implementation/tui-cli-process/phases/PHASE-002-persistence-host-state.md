@@ -22,13 +22,13 @@
 
 ## Implementation Units
 
-| Unit ID | Type | Summary | Source | Risk |
-| ------- | ---- | ------- | ------ | ---- |
-| IU-006 | reliability | Acquire and release `data/explorers.lock` as the single-instance guard. | `data-model.md`, `migration-plan.md` M-004 | High |
-| IU-007 | data | Create and atomically maintain `data/pids.json`; model stale PID verification. | `data-model.md`, `migration-plan.md` M-002 | High |
-| IU-008 | data | Open `data/sessions.db`, run engine-lib session schema, audit table migration, and `pruning_state` migration. | `migration-plan.md` M-001 | Medium |
-| IU-009 | data | Add 24-hour session pruning state and metrics without pruning audit rows. | `data-model.md` `pruning_state` | Medium |
-| IU-034 | test | Cover migrations and filesystem state with isolated temp directories. | `tests.md` Integration tests | Medium |
+| Unit ID | Type        | Summary                                                                                                       | Source                                     | Risk   |
+| ------- | ----------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------ |
+| IU-006  | reliability | Acquire and release `data/explorers.lock` as the single-instance guard.                                       | `data-model.md`, `migration-plan.md` M-004 | High   |
+| IU-007  | data        | Create and atomically maintain `data/pids.json`; model stale PID verification.                                | `data-model.md`, `migration-plan.md` M-002 | High   |
+| IU-008  | data        | Open `data/sessions.db`, run engine-lib session schema, audit table migration, and `pruning_state` migration. | `migration-plan.md` M-001                  | Medium |
+| IU-009  | data        | Add 24-hour session pruning state and metrics without pruning audit rows.                                     | `data-model.md` `pruning_state`            | Medium |
+| IU-034  | test        | Cover migrations and filesystem state with isolated temp directories.                                         | `tests.md` Integration tests               | Medium |
 
 ## Work Items
 

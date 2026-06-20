@@ -21,7 +21,10 @@ export function redactText(value: string): string {
   return out;
 }
 
-export function redactValue(value: unknown, seen = new WeakMap<object, unknown>()): unknown {
+export function redactValue(
+  value: unknown,
+  seen = new WeakMap<object, unknown>(),
+): unknown {
   if (typeof value === "string") return redactText(value);
   if (value === null || typeof value !== "object") return value;
   if (seen.has(value)) return "[circular]";
@@ -43,7 +46,9 @@ export function redactValue(value: unknown, seen = new WeakMap<object, unknown>(
   seen.set(value, out);
   for (const [key, child] of Object.entries(value)) {
     // ponytail: Keep PR1 redaction local; later phases can swap in engine-lib patterns if exported.
-    out[key] = SENSITIVE_KEY_PATTERN.test(key) ? REDACTION : redactValue(child, seen);
+    out[key] = SENSITIVE_KEY_PATTERN.test(key)
+      ? REDACTION
+      : redactValue(child, seen);
   }
   return out;
 }

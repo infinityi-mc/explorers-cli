@@ -23,14 +23,14 @@
 
 ## Implementation Units
 
-| Unit ID | Type | Summary | Source | Risk |
-| ------- | ---- | ------- | ------ | ---- |
-| IU-010 | contract | Load OpenAPI schemas for contract tests over operator, in-game, and tool surfaces. | `openapi.yaml`, `tests.md` | Medium |
-| IU-011 | security | Implement `MutatingCommandClassifier`, read-only command gate, and completeness tests. | ADR-LLD-003 | High |
-| IU-012 | reliability | Implement operator idempotency cache with UUID and fallback hash keys, 5 second TTL, and lazy eviction. | `idempotency.md` | Medium |
-| IU-013 | flow | Implement router dispatch for `/help`, `/session`, `/resume`, and `/clear` with contract-shaped responses. | `api.md`, `openapi.yaml` | Medium |
-| IU-014 | domain | Implement domain value objects and runtime state used by command and lifecycle phases. | `domain.md` | Medium |
-| IU-034 | test | Add command router unit and contract tests. | `tests.md` | Medium |
+| Unit ID | Type        | Summary                                                                                                    | Source                     | Risk   |
+| ------- | ----------- | ---------------------------------------------------------------------------------------------------------- | -------------------------- | ------ |
+| IU-010  | contract    | Load OpenAPI schemas for contract tests over operator, in-game, and tool surfaces.                         | `openapi.yaml`, `tests.md` | Medium |
+| IU-011  | security    | Implement `MutatingCommandClassifier`, read-only command gate, and completeness tests.                     | ADR-LLD-003                | High   |
+| IU-012  | reliability | Implement operator idempotency cache with UUID and fallback hash keys, 5 second TTL, and lazy eviction.    | `idempotency.md`           | Medium |
+| IU-013  | flow        | Implement router dispatch for `/help`, `/session`, `/resume`, and `/clear` with contract-shaped responses. | `api.md`, `openapi.yaml`   | Medium |
+| IU-014  | domain      | Implement domain value objects and runtime state used by command and lifecycle phases.                     | `domain.md`                | Medium |
+| IU-034  | test        | Add command router unit and contract tests.                                                                | `tests.md`                 | Medium |
 
 ## Work Items
 

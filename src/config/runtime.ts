@@ -28,7 +28,9 @@ export function parseRuntimeOptions(
       if (value === undefined || value.startsWith("--")) {
         return {
           ok: false,
-          diagnostics: [configIssue("config", "--config requires a file path.")],
+          diagnostics: [
+            configIssue("config", "--config requires a file path."),
+          ],
         };
       }
       configPath = value;
@@ -40,7 +42,9 @@ export function parseRuntimeOptions(
       if (value.length === 0) {
         return {
           ok: false,
-          diagnostics: [configIssue("config", "--config requires a file path.")],
+          diagnostics: [
+            configIssue("config", "--config requires a file path."),
+          ],
         };
       }
       configPath = value;
@@ -50,7 +54,11 @@ export function parseRuntimeOptions(
   return {
     ok: true,
     value: {
-      mode: validateConfig ? "validate-config" : readOnly ? "read-only" : "normal",
+      mode: validateConfig
+        ? "validate-config"
+        : readOnly
+          ? "read-only"
+          : "normal",
       configPath,
       verbose,
       argv,

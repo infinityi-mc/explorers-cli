@@ -7,9 +7,14 @@ export interface CrashReportOptions {
   readonly now?: () => Date;
 }
 
-export function writeCrashReport(error: unknown, options: CrashReportOptions): string {
+export function writeCrashReport(
+  error: unknown,
+  options: CrashReportOptions,
+): string {
   mkdirSync(options.directory, { recursive: true });
-  const timestamp = (options.now?.() ?? new Date()).toISOString().replace(/[:.]/g, "-");
+  const timestamp = (options.now?.() ?? new Date())
+    .toISOString()
+    .replace(/[:.]/g, "-");
   const filePath = join(options.directory, `crash-${timestamp}.json`);
   const payload = redactValue({
     timestamp,

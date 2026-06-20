@@ -23,13 +23,13 @@
 
 ## Implementation Units
 
-| Unit ID | Type | Summary | Source | Risk |
-| ------- | ---- | ------- | ------ | ---- |
-| IU-015 | flow | Implement server start validation, `Bun.spawn`, timeout, PID record, and `Done!` transition. | `design.md` Algorithm 2 | High |
-| IU-016 | reliability | Implement stop/restart and process-tree cleanup for POSIX and Windows. | ADR-LLD-002 | High |
-| IU-017 | reliability | Detect child exit, stdin close, crash status, PID deletion, audit events, and TUI updates within 2 seconds. | `sequences.md` section 2 | High |
-| IU-037 | delivery | Add cross-platform cleanup evidence planning for Windows/Linux CI. | ADR-LLD-002 mitigations | High |
-| IU-034 | test | Cover lifecycle commands and failure cases. | `tests.md` Key scenarios | High |
+| Unit ID | Type        | Summary                                                                                                     | Source                   | Risk |
+| ------- | ----------- | ----------------------------------------------------------------------------------------------------------- | ------------------------ | ---- |
+| IU-015  | flow        | Implement server start validation, `Bun.spawn`, timeout, PID record, and `Done!` transition.                | `design.md` Algorithm 2  | High |
+| IU-016  | reliability | Implement stop/restart and process-tree cleanup for POSIX and Windows.                                      | ADR-LLD-002              | High |
+| IU-017  | reliability | Detect child exit, stdin close, crash status, PID deletion, audit events, and TUI updates within 2 seconds. | `sequences.md` section 2 | High |
+| IU-037  | delivery    | Add cross-platform cleanup evidence planning for Windows/Linux CI.                                          | ADR-LLD-002 mitigations  | High |
+| IU-034  | test        | Cover lifecycle commands and failure cases.                                                                 | `tests.md` Key scenarios | High |
 
 ## Work Items
 

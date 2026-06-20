@@ -23,12 +23,12 @@
 
 ## Implementation Units
 
-| Unit ID | Type | Summary | Source | Risk |
-| ------- | ---- | ------- | ------ | ---- |
-| IU-035 | test | Add performance/load profiles for hot-reload, log ingestion, memory, and agent run latency. | `tests.md` Performance tests | Medium |
-| IU-036 | delivery | Add packaging/release scripts for npm package or Bun compiled binary, release notes, and docs. | HLD `06-deployment.md` | Medium |
-| IU-037 | delivery | Add Windows/Linux CI matrix and evidence for process cleanup parity. | ADR-LLD-002 mitigations | High |
-| IU-034 | test | Complete E2E test coverage and final verification evidence. | `tests.md` E2E journeys | High |
+| Unit ID | Type     | Summary                                                                                        | Source                       | Risk   |
+| ------- | -------- | ---------------------------------------------------------------------------------------------- | ---------------------------- | ------ |
+| IU-035  | test     | Add performance/load profiles for hot-reload, log ingestion, memory, and agent run latency.    | `tests.md` Performance tests | Medium |
+| IU-036  | delivery | Add packaging/release scripts for npm package or Bun compiled binary, release notes, and docs. | HLD `06-deployment.md`       | Medium |
+| IU-037  | delivery | Add Windows/Linux CI matrix and evidence for process cleanup parity.                           | ADR-LLD-002 mitigations      | High   |
+| IU-034  | test     | Complete E2E test coverage and final verification evidence.                                    | `tests.md` E2E journeys      | High   |
 
 ## Work Items
 

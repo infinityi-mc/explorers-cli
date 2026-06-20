@@ -26,62 +26,62 @@ listed per metric. The `forge/telemetry/meter`'s default histogram boundaries
 
 ### Server lifecycle metrics
 
-| Name | Type | Labels | Unit | Description |
-|---|---|---|---|---|
-| `explorers_cli_servers_state` | gauge | `serverId`, `state` | 1 | Current count of servers in each state (0 or 1 per server-state pair) |
-| `explorers_cli_server_start_total` | counter | `serverId`, `outcome` (`ok`/`failed`) | 1 | Server start attempts |
-| `explorers_cli_server_stop_total` | counter | `serverId`, `outcome` | 1 | Server stop attempts |
-| `explorers_cli_server_crash_total` | counter | `serverId`, `exitCode` | 1 | Server crashes (non-zero exit while RUNNING) |
-| `explorers_cli_server_start_duration_seconds` | histogram | `serverId` | seconds | Time from `Bun.spawn` to "Done!" line |
+| Name                                          | Type      | Labels                                | Unit    | Description                                                           |
+| --------------------------------------------- | --------- | ------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `explorers_cli_servers_state`                 | gauge     | `serverId`, `state`                   | 1       | Current count of servers in each state (0 or 1 per server-state pair) |
+| `explorers_cli_server_start_total`            | counter   | `serverId`, `outcome` (`ok`/`failed`) | 1       | Server start attempts                                                 |
+| `explorers_cli_server_stop_total`             | counter   | `serverId`, `outcome`                 | 1       | Server stop attempts                                                  |
+| `explorers_cli_server_crash_total`            | counter   | `serverId`, `exitCode`                | 1       | Server crashes (non-zero exit while RUNNING)                          |
+| `explorers_cli_server_start_duration_seconds` | histogram | `serverId`                            | seconds | Time from `Bun.spawn` to "Done!" line                                 |
 
 ### Log ingestion metrics (ADR-005)
 
-| Name | Type | Labels | Unit | Description |
-|---|---|---|---|---|
-| `explorers_cli_log_lines_ingested_total` | counter | `serverId` | 1 | Lines successfully pushed to the ring buffer |
-| `explorers_cli_log_lines_dropped_total` | counter | `serverId`, `reason` (`rate_limited`/`buffer_full`) | 1 | Lines dropped (NFR-PERF-004 / NFR-REL-006) |
-| `explorers_cli_log_buffer_bytes` | gauge | `serverId` | bytes | Current ring buffer size per server |
-| `explorers_cli_log_buffer_capacity_bytes` | gauge | `serverId` | bytes | Configured max (default 16 MB) |
+| Name                                      | Type    | Labels                                              | Unit  | Description                                  |
+| ----------------------------------------- | ------- | --------------------------------------------------- | ----- | -------------------------------------------- |
+| `explorers_cli_log_lines_ingested_total`  | counter | `serverId`                                          | 1     | Lines successfully pushed to the ring buffer |
+| `explorers_cli_log_lines_dropped_total`   | counter | `serverId`, `reason` (`rate_limited`/`buffer_full`) | 1     | Lines dropped (NFR-PERF-004 / NFR-REL-006)   |
+| `explorers_cli_log_buffer_bytes`          | gauge   | `serverId`                                          | bytes | Current ring buffer size per server          |
+| `explorers_cli_log_buffer_capacity_bytes` | gauge   | `serverId`                                          | bytes | Configured max (default 16 MB)               |
 
 ### Chat parser metrics (ADR-006)
 
-| Name | Type | Labels | Unit | Description |
-|---|---|---|---|---|
-| `explorers_cli_chat_lines_parsed_total` | counter | `serverId`, `outcome` (`mention`/`help`/`ignored`) | 1 | Lines processed by the parser |
-| `explorers_cli_chat_mentions_authorized_total` | counter | `serverId`, `agentId` | 1 | Authorized mentions (passed perm + rate check) |
-| `explorers_cli_chat_mentions_denied_total` | counter | `serverId`, `agentId`, `reason` (`permission`/`rate_limited`) | 1 | Denied mentions |
-| `explorers_cli_chat_rate_limit_window_utilization` | gauge | `serverId`, `agentId`, `playerName` | ratio (0..1) | Current rpm / configured rpm |
+| Name                                               | Type    | Labels                                                        | Unit         | Description                                    |
+| -------------------------------------------------- | ------- | ------------------------------------------------------------- | ------------ | ---------------------------------------------- |
+| `explorers_cli_chat_lines_parsed_total`            | counter | `serverId`, `outcome` (`mention`/`help`/`ignored`)            | 1            | Lines processed by the parser                  |
+| `explorers_cli_chat_mentions_authorized_total`     | counter | `serverId`, `agentId`                                         | 1            | Authorized mentions (passed perm + rate check) |
+| `explorers_cli_chat_mentions_denied_total`         | counter | `serverId`, `agentId`, `reason` (`permission`/`rate_limited`) | 1            | Denied mentions                                |
+| `explorers_cli_chat_rate_limit_window_utilization` | gauge   | `serverId`, `agentId`, `playerName`                           | ratio (0..1) | Current rpm / configured rpm                   |
 
 ### Agent executor metrics (engine-lib bridge)
 
-| Name | Type | Labels | Unit | Description |
-|---|---|---|---|---|
-| `explorers_cli_agent_runs_total` | counter | `agentId`, `serverId`, `outcome` (`ok`/`failed`/`cancelled`) | 1 | Agent runs started (mirrors engine-lib `agent.runs`) |
-| `explorers_cli_agent_run_duration_seconds` | histogram | `agentId`, `outcome` | seconds | End-to-end agent run duration (mirrors `agent.run.duration`) |
-| `explorers_cli_agent_tokens_total` | counter | `agentId`, `token.type` (`input`/`output`/`reasoning`/`cached`) | 1 | Token usage (mirrors `agent.tokens`) |
-| `explorers_cli_agent_tool_calls_total` | counter | `agentId`, `toolName`, `outcome` (`ok`/`blocked`/`failed`) | 1 | Tool calls |
-| `explorers_cli_agent_tool_duration_seconds` | histogram | `toolName` | seconds | Tool execution duration (mirrors `agent.tool.duration`) |
-| `explorers_cli_agent_provider_errors_total` | counter | `agentId`, `provider`, `status` | 1 | Provider errors (4xx/5xx/network) |
+| Name                                        | Type      | Labels                                                          | Unit    | Description                                                  |
+| ------------------------------------------- | --------- | --------------------------------------------------------------- | ------- | ------------------------------------------------------------ |
+| `explorers_cli_agent_runs_total`            | counter   | `agentId`, `serverId`, `outcome` (`ok`/`failed`/`cancelled`)    | 1       | Agent runs started (mirrors engine-lib `agent.runs`)         |
+| `explorers_cli_agent_run_duration_seconds`  | histogram | `agentId`, `outcome`                                            | seconds | End-to-end agent run duration (mirrors `agent.run.duration`) |
+| `explorers_cli_agent_tokens_total`          | counter   | `agentId`, `token.type` (`input`/`output`/`reasoning`/`cached`) | 1       | Token usage (mirrors `agent.tokens`)                         |
+| `explorers_cli_agent_tool_calls_total`      | counter   | `agentId`, `toolName`, `outcome` (`ok`/`blocked`/`failed`)      | 1       | Tool calls                                                   |
+| `explorers_cli_agent_tool_duration_seconds` | histogram | `toolName`                                                      | seconds | Tool execution duration (mirrors `agent.tool.duration`)      |
+| `explorers_cli_agent_provider_errors_total` | counter   | `agentId`, `provider`, `status`                                 | 1       | Provider errors (4xx/5xx/network)                            |
 
 ### Persistence metrics
 
-| Name | Type | Labels | Unit | Description |
-|---|---|---|---|---|
-| `explorers_cli_session_append_total` | counter | `serverId`, `agentId`, `outcome` | 1 | Session appends |
-| `explorers_cli_session_append_duration_seconds` | histogram |  | seconds | SQLite WAL append latency |
-| `explorers_cli_session_prune_total` | counter | `outcome` | 1 | Pruning job runs (every 24 h) |
-| `explorers_cli_session_rows_pruned_total` | counter |  | 1 | Rows deleted by pruning |
-| `explorers_cli_audit_writes_total` | counter | `actionType`, `outcome` | 1 | Audit entries written |
-| `explorers_cli_audit_write_duration_seconds` | histogram |  | seconds | Audit write latency |
+| Name                                            | Type      | Labels                           | Unit    | Description                   |
+| ----------------------------------------------- | --------- | -------------------------------- | ------- | ----------------------------- |
+| `explorers_cli_session_append_total`            | counter   | `serverId`, `agentId`, `outcome` | 1       | Session appends               |
+| `explorers_cli_session_append_duration_seconds` | histogram |                                  | seconds | SQLite WAL append latency     |
+| `explorers_cli_session_prune_total`             | counter   | `outcome`                        | 1       | Pruning job runs (every 24 h) |
+| `explorers_cli_session_rows_pruned_total`       | counter   |                                  | 1       | Rows deleted by pruning       |
+| `explorers_cli_audit_writes_total`              | counter   | `actionType`, `outcome`          | 1       | Audit entries written         |
+| `explorers_cli_audit_write_duration_seconds`    | histogram |                                  | seconds | Audit write latency           |
 
 ### Config metrics (ADR-008)
 
-| Name | Type | Labels | Unit | Description |
-|---|---|---|---|---|
-| `explorers_cli_config_reloads_total` | counter | `outcome` (`ok`/`rejected`) | 1 | Hot-reload attempts |
-| `explorers_cli_config_reload_duration_seconds` | histogram | `outcome` | seconds | Hot-reload latency (must be < 2 s, NFR-PERF-002) |
-| `explorers_cli_config_last_reload_timestamp` | gauge |  | seconds (epoch) | Last successful reload time |
-| `explorers_cli_pending_restart` | gauge | `serverId` | 1 | 1 when process-affecting config fields are pending restart (FR-HOT-009) |
+| Name                                           | Type      | Labels                      | Unit            | Description                                                             |
+| ---------------------------------------------- | --------- | --------------------------- | --------------- | ----------------------------------------------------------------------- |
+| `explorers_cli_config_reloads_total`           | counter   | `outcome` (`ok`/`rejected`) | 1               | Hot-reload attempts                                                     |
+| `explorers_cli_config_reload_duration_seconds` | histogram | `outcome`                   | seconds         | Hot-reload latency (must be < 2 s, NFR-PERF-002)                        |
+| `explorers_cli_config_last_reload_timestamp`   | gauge     |                             | seconds (epoch) | Last successful reload time                                             |
+| `explorers_cli_pending_restart`                | gauge     | `serverId`                  | 1               | 1 when process-affecting config fields are pending restart (FR-HOT-009) |
 
 ---
 
@@ -89,17 +89,17 @@ listed per metric. The `forge/telemetry/meter`'s default histogram boundaries
 
 ### Required fields on every log entry
 
-| Field | Type | Notes |
-|---|---|---|
-| `timestamp` | ISO 8601 | UTC, millisecond precision |
-| `level` | enum | `DEBUG`, `INFO`, `WARN`, `ERROR` |
-| `service` | string | Always `explorers-cli` for this component |
-| `trace_id` | uuid | From the request's trace context (forge/telemetry context) |
-| `span_id` | uuid | The span this log entry belongs to |
-| `request_id` | uuid | The request's correlation ID; for non-request logs, the boot id |
-| `channel` | string | `app` (default), `audit` (audit events) — separates audit from diagnostic per ADR-007 |
-| `serverId` | string | If the event is server-scoped; `null` otherwise |
-| `agentId` | string | If the event is agent-scoped; `null` otherwise |
+| Field        | Type     | Notes                                                                                 |
+| ------------ | -------- | ------------------------------------------------------------------------------------- |
+| `timestamp`  | ISO 8601 | UTC, millisecond precision                                                            |
+| `level`      | enum     | `DEBUG`, `INFO`, `WARN`, `ERROR`                                                      |
+| `service`    | string   | Always `explorers-cli` for this component                                             |
+| `trace_id`   | uuid     | From the request's trace context (forge/telemetry context)                            |
+| `span_id`    | uuid     | The span this log entry belongs to                                                    |
+| `request_id` | uuid     | The request's correlation ID; for non-request logs, the boot id                       |
+| `channel`    | string   | `app` (default), `audit` (audit events) — separates audit from diagnostic per ADR-007 |
+| `serverId`   | string   | If the event is server-scoped; `null` otherwise                                       |
+| `agentId`    | string   | If the event is agent-scoped; `null` otherwise                                        |
 
 ### Redaction (NFR-SEC-007 / NFR-SEC-008)
 
@@ -115,6 +115,7 @@ is applied to every log entry. The default patterns (from
 - `api_key` / `token` / `secret` / `password` assignments
 
 Additionally, the LLD requires:
+
 - Agent prompts and responses are NOT logged at `INFO` level (NFR-SEC-008).
   They are logged at `DEBUG` level only when `--verbose` is set.
 - Player chat content (the `message` field of a `Mention`) is NOT logged at
@@ -127,97 +128,97 @@ Additionally, the LLD requires:
 
 Emitted when a server reaches `RUNNING` state.
 
-| Field | Type | Notes |
-|---|---|---|
-| `serverId` | string | |
-| `pid` | int | |
-| `startupDurationMs` | int | Time from spawn to "Done!" |
+| Field               | Type   | Notes                      |
+| ------------------- | ------ | -------------------------- |
+| `serverId`          | string |                            |
+| `pid`               | int    |                            |
+| `startupDurationMs` | int    | Time from spawn to "Done!" |
 
 #### `server_crashed`
 
-| Field | Type | Notes |
-|---|---|---|
-| `serverId` | string | |
-| `exitCode` | int | |
-| `signal` | string | If killed by signal |
+| Field      | Type   | Notes               |
+| ---------- | ------ | ------------------- |
+| `serverId` | string |                     |
+| `exitCode` | int    |                     |
+| `signal`   | string | If killed by signal |
 
 #### `mention_authorized`
 
-| Field | Type | Notes |
-|---|---|---|
-| `serverId` | string | |
-| `agentId` | string | |
+| Field        | Type   | Notes                                            |
+| ------------ | ------ | ------------------------------------------------ |
+| `serverId`   | string |                                                  |
+| `agentId`    | string |                                                  |
 | `playerName` | string | (not redacted — it's a vanilla MC name, not PII) |
-| `runId` | string | engine-lib run id |
+| `runId`      | string | engine-lib run id                                |
 
 #### `mention_denied`
 
-| Field | Type | Notes |
-|---|---|---|
-| `serverId` | string | |
-| `agentId` | string | |
-| `playerName` | string | |
-| `reason` | string | `permission` / `rate_limited` |
+| Field        | Type   | Notes                         |
+| ------------ | ------ | ----------------------------- |
+| `serverId`   | string |                               |
+| `agentId`    | string |                               |
+| `playerName` | string |                               |
+| `reason`     | string | `permission` / `rate_limited` |
 
 #### `tool_blocked`
 
-| Field | Type | Notes |
-|---|---|---|
-| `agentId` | string | |
-| `toolName` | string | |
-| `target` | string | Command text or file path (redacted if it matches a secret pattern) |
-| `reason` | string | `COMMAND_BLOCKED` / `PATH_TRAVERSAL_BLOCKED` / `OFFLINE_FAIL` |
+| Field      | Type   | Notes                                                               |
+| ---------- | ------ | ------------------------------------------------------------------- |
+| `agentId`  | string |                                                                     |
+| `toolName` | string |                                                                     |
+| `target`   | string | Command text or file path (redacted if it matches a secret pattern) |
+| `reason`   | string | `COMMAND_BLOCKED` / `PATH_TRAVERSAL_BLOCKED` / `OFFLINE_FAIL`       |
 
 #### `tellraw_sent`
 
 Emitted when the Agent Executor delivers a response chunk via `/tellraw`.
 
-| Field | Type | Notes |
-|---|---|---|
-| `serverId` | string | |
-| `agentId` | string | |
-| `runId` | string | engine-lib run id |
-| `chunkIndex` | int | 0-based chunk position |
-| `byteLength` | int | Chunk length, ≤ 200 per FR-INV-009 |
+| Field        | Type   | Notes                              |
+| ------------ | ------ | ---------------------------------- |
+| `serverId`   | string |                                    |
+| `agentId`    | string |                                    |
+| `runId`      | string | engine-lib run id                  |
+| `chunkIndex` | int    | 0-based chunk position             |
+| `byteLength` | int    | Chunk length, ≤ 200 per FR-INV-009 |
 
 #### `say_fallback`
 
 Emitted when `/tellraw` delivery fails and the system falls back to `/say`.
 
-| Field | Type | Notes |
-|---|---|---|
-| `serverId` | string | |
-| `agentId` | string | |
-| `runId` | string | |
-| `chunkIndex` | int | |
-| `reason` | string | Failure reason from `sendCommand` |
+| Field        | Type   | Notes                             |
+| ------------ | ------ | --------------------------------- |
+| `serverId`   | string |                                   |
+| `agentId`    | string |                                   |
+| `runId`      | string |                                   |
+| `chunkIndex` | int    |                                   |
+| `reason`     | string | Failure reason from `sendCommand` |
 
 #### `server_stdin_closed`
 
 Emitted when a running Minecraft server's stdin closes unexpectedly.
 
-| Field | Type | Notes |
-|---|---|---|
-| `serverId` | string | |
-| `pid` | int | Last known process id |
-| `previousState` | string | Expected `RUNNING` |
+| Field           | Type   | Notes                 |
+| --------------- | ------ | --------------------- |
+| `serverId`      | string |                       |
+| `pid`           | int    | Last known process id |
+| `previousState` | string | Expected `RUNNING`    |
 
 #### `hot_reload`
 
-| Field | Type | Notes |
-|---|---|---|
-| `outcome` | string | `ok` / `rejected` |
-| `changedKeys` | string[] | Dotted paths that changed |
+| Field                   | Type     | Notes                                           |
+| ----------------------- | -------- | ----------------------------------------------- |
+| `outcome`               | string   | `ok` / `rejected`                               |
+| `changedKeys`           | string[] | Dotted paths that changed                       |
 | `pendingRestartServers` | string[] | Servers with changes that apply on next restart |
-| `reason` | string | If rejected, the validation error |
+| `reason`                | string   | If rejected, the validation error               |
 
 #### `crash_report`
 
-| Field | Type | Notes |
-|---|---|---|
-| `crashFile` | string | Path to `crash-<timestamp>.json` |
-| `error` | string | The uncaught exception message (redacted) |
-| `stack` | string[] | The stack frames (redacted) |
+| Field       | Type     | Notes                                     |
+| ----------- | -------- | ----------------------------------------- |
+| `crashFile` | string   | Path to `crash-<timestamp>.json`          |
+| `error`     | string   | The uncaught exception message (redacted) |
+| `stack`     | string[] | The stack frames (redacted)               |
 
 ### Log levels
 
@@ -250,6 +251,7 @@ indefinitely (see "Soft-delete" in `data-model.md`).
 ### Span naming convention
 
 Spans are named `<operation>:<detail>`:
+
 - `lifecycle:boot` — root span for the boot sequence
 - `lifecycle:shutdown` — root span for the shutdown sequence
 - `server:start:<serverId>` — server spawn + startup wait
@@ -291,6 +293,7 @@ chat:parse:survival
 ### Span attributes
 
 Every span records:
+
 - `request_id` (uuid) — correlates with logs
 - `service.name` (string) — always `explorers-cli`
 - `serverId` (string) — if server-scoped
@@ -300,6 +303,7 @@ Every span records:
 - `error.message` (string) — if error=true
 
 Per-span-type attributes:
+
 - `server:start` — `pid`, `startupDurationMs`, `outcome`
 - `agent:run` — `runId`, `agentId`, `inputTokens`, `outputTokens`, `finishReason`
 - `agent:tool` — `toolName`, `outcome` (`ok`/`blocked`/`failed`)
@@ -313,15 +317,15 @@ When telemetry is enabled, the following alerts SHOULD be configured on the
 OTLP collector side. The manager itself does not evaluate alerts; it emits
 the metrics.
 
-| Alert name | Condition | Severity | Runbook |
-|---|---|---|---|
-| `ServerCrashLoop` | `rate(explorers_cli_server_crash_total[5m]) > 0.5` for a single `serverId` | P2 | runbooks/server-crash-loop.md |
-| `LogDroppedFlood` | `rate(explorers_cli_log_lines_dropped_total[1m]) > 100` | P3 | runbooks/log-dropped-flood.md (operator should check server logs) |
-| `MentionDeniedSpike` | `rate(explorers_cli_chat_mentions_denied_total[5m]) > 10` for a single `serverId` | P3 | runbooks/mention-denied-spike.md (possible unauthorized player or rate-limit too low) |
-| `ProviderErrorRate` | `rate(explorers_cli_agent_provider_errors_total[5m]) / rate(explorers_cli_agent_runs_total[5m]) > 0.2` | P2 | runbooks/provider-error-rate.md |
-| `HotReloadRejected` | `increase(explorers_cli_config_reloads_total{outcome="rejected"}[1h]) > 0` | P3 | runbooks/hot-reload-rejected.md (operator edited config invalidly) |
-| `AuditWriteFailure` | `rate(explorers_cli_audit_writes_total{outcome="failed"}[5m]) > 0` | P1 | runbooks/audit-write-failure.md (disk full or DB locked) |
-| `SessionAppendLatencyHigh` | `histogram_quantile(0.95, rate(explorers_cli_session_append_duration_seconds_bucket[5m])) > 0.5` | P2 | runbooks/session-append-latency.md (WAL checkpoint needed?) |
+| Alert name                 | Condition                                                                                              | Severity | Runbook                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------- |
+| `ServerCrashLoop`          | `rate(explorers_cli_server_crash_total[5m]) > 0.5` for a single `serverId`                             | P2       | runbooks/server-crash-loop.md                                                         |
+| `LogDroppedFlood`          | `rate(explorers_cli_log_lines_dropped_total[1m]) > 100`                                                | P3       | runbooks/log-dropped-flood.md (operator should check server logs)                     |
+| `MentionDeniedSpike`       | `rate(explorers_cli_chat_mentions_denied_total[5m]) > 10` for a single `serverId`                      | P3       | runbooks/mention-denied-spike.md (possible unauthorized player or rate-limit too low) |
+| `ProviderErrorRate`        | `rate(explorers_cli_agent_provider_errors_total[5m]) / rate(explorers_cli_agent_runs_total[5m]) > 0.2` | P2       | runbooks/provider-error-rate.md                                                       |
+| `HotReloadRejected`        | `increase(explorers_cli_config_reloads_total{outcome="rejected"}[1h]) > 0`                             | P3       | runbooks/hot-reload-rejected.md (operator edited config invalidly)                    |
+| `AuditWriteFailure`        | `rate(explorers_cli_audit_writes_total{outcome="failed"}[5m]) > 0`                                     | P1       | runbooks/audit-write-failure.md (disk full or DB locked)                              |
+| `SessionAppendLatencyHigh` | `histogram_quantile(0.95, rate(explorers_cli_session_append_duration_seconds_bucket[5m])) > 0.5`       | P2       | runbooks/session-append-latency.md (WAL checkpoint needed?)                           |
 
 ---
 
@@ -331,6 +335,7 @@ the metrics.
 contract; how they're visualized is the operator's call.)
 
 Reference dashboard should show:
+
 - **Top row**: server state grid (one tile per server, colored by state),
   hot-reload status, audit write rate.
 - **Middle row**: agent run rate + outcome breakdown, provider error rate,

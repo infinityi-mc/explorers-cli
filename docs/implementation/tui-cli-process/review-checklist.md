@@ -31,32 +31,32 @@ Use this checklist for every implementation PR tied to a phase card.
 
 ## Required Verification Evidence
 
-| Evidence | Required when |
-| -------- | ------------- |
-| `bun test` output | Every phase after PHASE-001 adds the test script. |
-| TypeScript strict check output | Every phase after PHASE-001 adds the check script. |
-| Contract validation output | Any phase changing command, parser, session, tellraw, or tool response shapes. |
-| Migration output or DB inspection | PHASE-002 and later phases changing persistence. |
-| Process cleanup evidence | PHASE-004 and PHASE-010. |
-| Log/metric/audit sample | Any phase adding instrumented behavior. |
-| TUI screenshot or terminal capture | Any phase changing visible TUI state. |
-| Security negative test output | Any phase touching permissions, sandboxing, secrets, paths, commands, or read-only mode. |
-| Performance/load output | PHASE-010 or any earlier phase claiming an NFR-PERF target. |
+| Evidence                           | Required when                                                                            |
+| ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| `bun test` output                  | Every phase after PHASE-001 adds the test script.                                        |
+| TypeScript strict check output     | Every phase after PHASE-001 adds the check script.                                       |
+| Contract validation output         | Any phase changing command, parser, session, tellraw, or tool response shapes.           |
+| Migration output or DB inspection  | PHASE-002 and later phases changing persistence.                                         |
+| Process cleanup evidence           | PHASE-004 and PHASE-010.                                                                 |
+| Log/metric/audit sample            | Any phase adding instrumented behavior.                                                  |
+| TUI screenshot or terminal capture | Any phase changing visible TUI state.                                                    |
+| Security negative test output      | Any phase touching permissions, sandboxing, secrets, paths, commands, or read-only mode. |
+| Performance/load output            | PHASE-010 or any earlier phase claiming an NFR-PERF target.                              |
 
 ## Phase-Specific Gates
 
-| Phase | Gate |
-| ----- | ---- |
-| PHASE-001 | Scripts, config validation, telemetry baseline, and crash redaction are in place before feature PRs. |
-| PHASE-002 | Greenfield migrations run in LLD order and are safe to rerun. |
-| PHASE-003 | Every router command is classified as mutating or non-mutating. |
-| PHASE-004 | No orphan child process remains after tests, including failure and timeout paths. |
-| PHASE-005 | Invalid hot-reload retains last-known-good config and surfaces a TUI warning. |
-| PHASE-006 | Unauthorized and rate-limited mentions are silently ignored for players but audited for operators. |
-| PHASE-007 | Provider timeouts persist partial response per LLD and map to stable error codes. |
-| PHASE-008 | `/tellraw` chunks are <= 200 characters and fallback behavior is audited. |
+| Phase     | Gate                                                                                                                   |
+| --------- | ---------------------------------------------------------------------------------------------------------------------- |
+| PHASE-001 | Scripts, config validation, telemetry baseline, and crash redaction are in place before feature PRs.                   |
+| PHASE-002 | Greenfield migrations run in LLD order and are safe to rerun.                                                          |
+| PHASE-003 | Every router command is classified as mutating or non-mutating.                                                        |
+| PHASE-004 | No orphan child process remains after tests, including failure and timeout paths.                                      |
+| PHASE-005 | Invalid hot-reload retains last-known-good config and surfaces a TUI warning.                                          |
+| PHASE-006 | Unauthorized and rate-limited mentions are silently ignored for players but audited for operators.                     |
+| PHASE-007 | Provider timeouts persist partial response per LLD and map to stable error codes.                                      |
+| PHASE-008 | `/tellraw` chunks are <= 200 characters and fallback behavior is audited.                                              |
 | PHASE-009 | Command and filesystem tools fail closed on deny cases and return ToolFailure instead of throwing for domain failures. |
-| PHASE-010 | Windows and Linux cleanup evidence, performance profile, and release packaging evidence are attached. |
+| PHASE-010 | Windows and Linux cleanup evidence, performance profile, and release packaging evidence are attached.                  |
 
 ## Definition Of Done
 

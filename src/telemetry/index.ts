@@ -31,10 +31,7 @@ export function createAppTelemetry(
     exporter,
     level: config.logging.level,
     attributes: { service: "explorers-cli" },
-    middleware: [
-      redact({ patterns: defaultRedactionPatterns }),
-      serialize(),
-    ],
+    middleware: [redact({ patterns: defaultRedactionPatterns }), serialize()],
   });
 
   const telemetry = initTelemetry({

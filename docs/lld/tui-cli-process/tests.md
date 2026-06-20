@@ -24,6 +24,7 @@ Bun-native).
 `MutatingCommandClassifier`, `tryReload` validation, `CanonicalPath.contains`).
 
 **What's tested**:
+
 - Domain entity methods — `Server` state transitions, `Player.canInvoke`,
   `Session.append`/`loadRecent` (against an in-memory `SessionStore`).
 - Value object invariants — `PlayerName('Steve!')` throws, `Alias('@bad')`
@@ -38,6 +39,7 @@ Bun-native).
   and read-only mode.
 
 **What's mocked**:
+
 - `Bun.spawn` — mocked to return a fake child process with a stub stdout
   that emits scripted lines.
 - Filesystem — `Bun.file`, `realpath`, `fileExists`, `isExecutable` are
@@ -50,6 +52,7 @@ Bun-native).
   which wires recording exporters; assert on recorded spans/metrics/logs.
 
 **What's NOT tested at unit level**:
+
 - TUI rendering (covered by snapshot tests at the integration layer).
 - SQLite queries (covered by integration tests against a real `:memory:` DB).
 - HTTP serialization (no inbound HTTP server; N/A).
@@ -62,6 +65,7 @@ test for the happy path and one per error code in `errors.md`. Every
 critical flow in `sequences.md` has at least one integration test.
 
 **What's tested**:
+
 - DB queries against a real `bun:sqlite` `:memory:` DB via
   `engine-lib/session-stores`'s `createSqliteSessionStore`.
 - `forge/config` hot-reload against a real temp file (write-to-temp + rename
@@ -75,6 +79,7 @@ critical flow in `sequences.md` has at least one integration test.
 - Audit log against the real `audit_entries` table in `data/sessions.db`.
 
 **Test data setup**:
+
 - Use factory functions: `ServerFactory.create({...})`, `AgentFactory.create({...})`,
   `PlayerFactory.create({...})`, `MentionFactory.create({...})`.
 - Each test sets up its own config snapshot via `mockConfig({servers:{...}})`.
@@ -83,6 +88,7 @@ critical flow in `sequences.md` has at least one integration test.
   `Application.stop()` handles component teardown.
 
 **What's mocked**:
+
 - LLM provider (via `engine-lib/testing` `mockProvider` — no network).
 - Time (still inject a `TestClock`).
 
@@ -92,6 +98,7 @@ critical flow in `sequences.md` has at least one integration test.
 contract test.
 
 **What's tested**:
+
 - The in-process `CommandRouter` (which dispatches slash-commands) returns
   shapes that match the OpenAPI schemas for `StartServerResponse`,
   `StopServerResponse`, `AgentRunResponse`, `Error`, etc.
@@ -114,6 +121,7 @@ the router that violates the spec is caught in CI, not in production.
 comprehensive coverage at this layer — it's slow and brittle.
 
 **What's tested**:
+
 1. **Boot → start server → player mentions agent → response delivered →
    stop server → shutdown** — the full happy-path journey from `sequences.md`
    §1 + §3 + §2. Uses a stub Java script that emits the "Done!" line and
@@ -248,9 +256,16 @@ These scenarios must always pass; failure is a release blocker.
 - Default factories produce valid objects; tests override only the fields
   they care about:
   ```ts
-  const server = ServerFactory.create({ id: 'survival', ram: 4096 });
-  const player = PlayerFactory.create({ serverId: 'survival', allowedAgents: ['assistant'] });
-  const mention = MentionFactory.create({ serverId: 'survival', agentId: 'assistant', playerName: 'Steve' });
+  const server = ServerFactory.create({ id: "survival", ram: 4096 });
+  const player = PlayerFactory.create({
+    serverId: "survival",
+    allowedAgents: ["assistant"],
+  });
+  const mention = MentionFactory.create({
+    serverId: "survival",
+    agentId: "assistant",
+    playerName: "Steve",
+  });
   ```
 - Reference data (servers, agents, players, providers) is seeded once per
   test via `mockConfig({...})` from `forge/config/testing`.
@@ -264,6 +279,7 @@ These scenarios must always pass; failure is a release blocker.
 Run weekly (not on every PR — too slow).
 
 **What's measured**:
+
 - `/start` cold-start latency (Bun spawn to "Done!" line) — target < 3 s
   for a stub Java script (NFR-PERF-005 measures cold start of the manager
   itself, not the spawned server).
@@ -276,6 +292,7 @@ Run weekly (not on every PR — too slow).
   ms (no NFR directly; sanity check).
 
 **Load profile**:
+
 - Ramp from 0 to 10 active servers over 2 minutes.
 - Hold at 10 servers with mixed load (some idle, some logging, some running
   agents) for 10 minutes.

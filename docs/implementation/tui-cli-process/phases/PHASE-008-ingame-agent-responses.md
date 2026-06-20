@@ -23,12 +23,12 @@
 
 ## Implementation Units
 
-| Unit ID | Type | Summary | Source | Risk |
-| ------- | ---- | ------- | ------ | ---- |
-| IU-029 | flow | Wire Chat Parser mentions to Agent Executor with N-line context injection excluding trigger line. | `sequences.md` section 3 | High |
-| IU-030 | reliability | Implement chunked `/tellraw`, formatting strip, pacing, `/say` fallback, and offline failure. | `design.md` Algorithm 6 | High |
-| IU-024 | observability | Extend mention audit and metrics through run completion. | `observability.md` Chat parser and agent metrics | Medium |
-| IU-034 | test | Cover end-to-end mention to response delivery. | `tests.md` E2E scenario 1 | High |
+| Unit ID | Type          | Summary                                                                                           | Source                                           | Risk   |
+| ------- | ------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------ |
+| IU-029  | flow          | Wire Chat Parser mentions to Agent Executor with N-line context injection excluding trigger line. | `sequences.md` section 3                         | High   |
+| IU-030  | reliability   | Implement chunked `/tellraw`, formatting strip, pacing, `/say` fallback, and offline failure.     | `design.md` Algorithm 6                          | High   |
+| IU-024  | observability | Extend mention audit and metrics through run completion.                                          | `observability.md` Chat parser and agent metrics | Medium |
+| IU-034  | test          | Cover end-to-end mention to response delivery.                                                    | `tests.md` E2E scenario 1                        | High   |
 
 ## Work Items
 

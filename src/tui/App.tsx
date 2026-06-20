@@ -7,7 +7,8 @@ export function App({ viewModel }: { readonly viewModel: AppViewModel }) {
       <box flexDirection="column" marginBottom={1}>
         <ascii-font font="tiny" text={viewModel.title} />
         <text attributes={TextAttributes.DIM}>
-          mode: {viewModel.mode} | config: {viewModel.configStatus} | {viewModel.configPath}
+          mode: {viewModel.mode} | config: {viewModel.configStatus} |{" "}
+          {viewModel.configPath}
         </text>
       </box>
 
@@ -19,9 +20,17 @@ export function App({ viewModel }: { readonly viewModel: AppViewModel }) {
 
       <box flexDirection="row" flexGrow={1} gap={1}>
         {viewModel.panels.map((panel) => (
-          <box key={panel} border flexGrow={1} padding={1} flexDirection="column">
+          <box
+            key={panel}
+            border
+            flexGrow={1}
+            padding={1}
+            flexDirection="column"
+          >
             <text attributes={TextAttributes.BOLD}>{panel}</text>
-            <text attributes={TextAttributes.DIM}>waiting for later-phase data</text>
+            <text attributes={TextAttributes.DIM}>
+              waiting for later-phase data
+            </text>
           </box>
         ))}
       </box>

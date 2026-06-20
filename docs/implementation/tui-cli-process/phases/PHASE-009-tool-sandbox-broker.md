@@ -23,12 +23,12 @@
 
 ## Implementation Units
 
-| Unit ID | Type | Summary | Source | Risk |
-| ------- | ---- | ------- | ------ | ---- |
-| IU-031 | security | Register shell/fs tools with per-server roots, command allowlists, NBT deny rules, and server-state gate. | `design.md` Tool Sandbox Broker row | High |
-| IU-032 | contract | Validate `run_command`, `read_file`, and `write_file` schemas and ToolResult contract. | `openapi.yaml` AgentTools | Medium |
-| IU-033 | observability | Audit tool success, blocked, and failed outcomes with redacted targets and argument digests. | `data-model.md` `audit_entries` | Medium |
-| IU-034 | test | Cover tool sandbox security cases. | `tests.md` Security scenarios | High |
+| Unit ID | Type          | Summary                                                                                                   | Source                              | Risk   |
+| ------- | ------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------ |
+| IU-031  | security      | Register shell/fs tools with per-server roots, command allowlists, NBT deny rules, and server-state gate. | `design.md` Tool Sandbox Broker row | High   |
+| IU-032  | contract      | Validate `run_command`, `read_file`, and `write_file` schemas and ToolResult contract.                    | `openapi.yaml` AgentTools           | Medium |
+| IU-033  | observability | Audit tool success, blocked, and failed outcomes with redacted targets and argument digests.              | `data-model.md` `audit_entries`     | Medium |
+| IU-034  | test          | Cover tool sandbox security cases.                                                                        | `tests.md` Security scenarios       | High   |
 
 ## Work Items
 

@@ -153,11 +153,13 @@ process ID of the spawned Java child, if any) and for the per-server
 `RUNNING → STOPPING → STOPPED` (graceful stop). `FAILED` is recoverable via `/restart`.
 
 **Invariants**:
+
 - `jarFile` MUST resolve inside `path` after canonicalization (NFR-SEC-002).
 - `state === RUNNING` implies `pid` is present and the child process is alive.
 - `state === STOPPED` implies `pid` is `None`.
 
 **Key methods**:
+
 - `start()` — Algorithm 2 in `design.md`. Spawns via `Bun.spawn`, records
   PID, sets up startup timeout.
 - `stop(force)` — Sends `/stop` to stdin, waits for exit, force-kills on
@@ -174,6 +176,7 @@ reference to a `ProviderName` (resolved to a `Provider` at runtime via the
 provider registry).
 
 **Invariants**:
+
 - `alias` MUST match `^[a-zA-Z0-9_-]{2,}$` and be unique across active config.
 - `commandAllowlist` tokens MUST be exact prefix tokens (e.g. `whitelist add`,
   not `whitelist`).
@@ -190,6 +193,7 @@ A player authorized to invoke agents on a specific server. Identity is
 different `Player` (per SRS §4.6).
 
 **Invariants**:
+
 - `name` matches `^[a-zA-Z0-9_]{1,16}$` (NFR-SEC-006).
 - Comparisons against incoming chat names are case-insensitive (NFR-SEC-005).
 
@@ -205,11 +209,13 @@ players on a given server who mention a given agent share the active session
 for that `(serverId, agentId)` prefix.
 
 **Invariants**:
+
 - `messages` are append-only (no updates, no deletes within a session;
   pruning happens via a separate job).
 - `version` increments on every append (engine-lib CAS).
 
 **Key methods**:
+
 - `append(messages)` — delegates to `SessionStore.append`.
 - `loadRecent(n)` — fetches the last N messages (used for the
   `ingameMessageWindow` context injection, FR-CHAT-011).
@@ -247,8 +253,9 @@ equal iff their string values are equal.
 **Invariants**: `value` is an absolute path with no symbolic links.
 
 **Key methods**:
+
 - `contains(other)` — true iff `other.value` starts with `this.value +
-  separator`. Used by the Tool Sandbox Broker.
+separator`. Used by the Tool Sandbox Broker.
 - `resolve(relative)` — joins and canonicalizes; returns a new
   `CanonicalPath`. Throws if the result escapes the root (defensive).
 

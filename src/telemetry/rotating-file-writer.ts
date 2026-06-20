@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, renameSync, rmSync, statSync, appendFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  appendFileSync,
+} from "node:fs";
 import { dirname } from "node:path";
 import type { LogExporter, LogRecord } from "@infinityi/forge/telemetry/log";
 
@@ -8,7 +15,9 @@ export interface RotatingFileExporterOptions {
   readonly maxFiles?: number;
 }
 
-export function rotatingFileExporter(options: RotatingFileExporterOptions): LogExporter {
+export function rotatingFileExporter(
+  options: RotatingFileExporterOptions,
+): LogExporter {
   const maxFiles = options.maxFiles ?? 5;
   if (!Number.isInteger(maxFiles) || maxFiles < 1) {
     throw new Error("maxFiles must be an integer greater than or equal to 1.");
@@ -18,7 +27,12 @@ export function rotatingFileExporter(options: RotatingFileExporterOptions): LogE
   return {
     export(record) {
       const line = `${JSON.stringify(formatRecord(record))}\n`;
-      rotateIfNeeded(options.filePath, byteLength(line), options.rotationBytes, maxFiles);
+      rotateIfNeeded(
+        options.filePath,
+        byteLength(line),
+        options.rotationBytes,
+        maxFiles,
+      );
       appendFileSync(options.filePath, line, "utf8");
     },
     async flush() {},
