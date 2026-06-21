@@ -59,6 +59,7 @@ export async function runCli(
       startTui: options.startTui ?? startTui,
       installSignals: options.installSignals,
       exit: options.exit,
+      dataDir: join(dirname(loaded.value.configPath), "data"),
     });
     const done = app.done.finally(async () => {
       disposeCrashReporter();

@@ -7,11 +7,16 @@ import {
   type ExitFn,
   type Logger,
 } from "@infinityi/forge/lifecycle";
+import { dirname, join } from "node:path";
 import { AGENT_COMPONENT } from "../agent";
 import { CHAT_COMPONENT } from "../chat";
 import type { LoadedRuntimeConfig, RuntimeOptions } from "../config";
 import { LOG_COMPONENT } from "../log";
-import { PERSISTENCE_COMPONENT } from "../persistence";
+import {
+  PERSISTENCE_COMPONENT,
+  startPersistence,
+  type PersistenceState,
+} from "../persistence";
 import { PROCESS_COMPONENT } from "../process";
 import { ROUTER_COMPONENT } from "../router";
 import { TOOLS_COMPONENT } from "../tools";
@@ -26,6 +31,7 @@ export interface BootExplorersOptions {
   readonly exit?: ExitFn;
   readonly startTimeout?: number;
   readonly shutdownTimeout?: number;
+  readonly dataDir?: string;
 }
 
 export async function bootExplorers(
@@ -45,6 +51,7 @@ export function createFoundationComponents(
   options: BootExplorersOptions,
 ): Component[] {
   let stopTui: StopTui | undefined;
+  let persistence: PersistenceState | undefined;
 
   return [
     asComponent("config", {
@@ -58,7 +65,18 @@ export function createFoundationComponents(
       },
     }),
     asComponent("telemetry"),
-    asComponent(PERSISTENCE_COMPONENT),
+    asComponent(PERSISTENCE_COMPONENT, {
+      start: async () => {
+        persistence = await startPersistence({
+          dataDir: options.dataDir ?? join(dirname(options.loaded.configPath), "data"),
+          logger: options.logger,
+        });
+      },
+      stop: async () => {
+        await persistence?.stop();
+        persistence = undefined;
+      },
+    }),
     asComponent(ROUTER_COMPONENT),
     asComponent(PROCESS_COMPONENT),
     asComponent(LOG_COMPONENT),
