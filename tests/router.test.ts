@@ -138,7 +138,42 @@ describe("operator router", () => {
     expect(clearCalls).toBe(1);
   });
 
-  test("returns stable errors for missing sessions and later-phase handlers", async () => {
+  test("routes lifecycle commands to the server manager", async () => {
+    const calls: string[] = [];
+    const router = new OperatorRouter({
+      runtimeMode: "normal",
+      serverLifecycle: {
+        start: async (serverId) => {
+          calls.push(`start:${serverId}`);
+          return { ok: true, serverId, state: "RUNNING", pid: 42 };
+        },
+        stop: async (serverId) => {
+          calls.push(`stop:${serverId}`);
+          return { ok: true, serverId, state: "STOPPED" };
+        },
+        restart: async (serverId) => {
+          calls.push(`restart:${serverId}`);
+          return { ok: false, code: "PORT_CONFLICT", message: "Port 25565 is already in use", details: { port: 25565 } };
+        },
+      },
+    });
+
+    expect(await router.route(parseOperatorCommand("/start survival", "start-key"))).toEqual({
+      status: 200,
+      body: { serverId: "survival", state: "RUNNING", pid: 42 },
+    });
+    expect(await router.route(parseOperatorCommand("/stop survival", "stop-key"))).toEqual({
+      status: 200,
+      body: { serverId: "survival", state: "STOPPED", pid: undefined },
+    });
+    expect(await router.route(parseOperatorCommand("/restart survival", "restart-key"))).toEqual({
+      status: 422,
+      body: { code: "PORT_CONFLICT", message: "Port 25565 is already in use", details: { port: 25565 } },
+    });
+    expect(calls).toEqual(["start:survival", "stop:survival", "restart:survival"]);
+  });
+
+  test("returns stable errors for missing sessions and absent later-phase handlers", async () => {
     const router = new OperatorRouter({
       runtimeMode: "normal",
       sessionStore: { resume: () => undefined },
@@ -154,8 +189,18 @@ describe("operator router", () => {
       },
     });
 
-    const placeholder = await router.route(parseOperatorCommand("/start survival", "start-key"));
+    const placeholder = await router.route(parseOperatorCommand("/chat assistant hello", "chat-key"));
     expect(placeholder.status).toBe(501);
     expect("code" in placeholder.body ? placeholder.body.code : undefined).toBe("NOT_IMPLEMENTED");
+
+    const missingServer = await router.route(parseOperatorCommand("/start", "missing-server-key"));
+    expect(missingServer).toEqual({
+      status: 400,
+      body: { code: "MISSING_SERVER_ID", message: "No server was specified." },
+    });
+
+    const missingLifecycle = await router.route(parseOperatorCommand("/start survival", "missing-lifecycle-key"));
+    expect(missingLifecycle.status).toBe(501);
+    expect("code" in missingLifecycle.body ? missingLifecycle.body.code : undefined).toBe("NOT_IMPLEMENTED");
   });
 });

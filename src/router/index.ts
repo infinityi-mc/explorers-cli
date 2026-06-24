@@ -1,3 +1,5 @@
+import type { LifecycleErrorCode, LifecycleResult, ServerLifecycleManager } from "../process";
+
 export const ROUTER_COMPONENT = "operator-router";
 
 export type RuntimeMode = "normal" | "read-only" | "validate-config";
@@ -52,7 +54,7 @@ export interface OperatorError {
 
 export type OperatorResponse =
   | { readonly status: 200; readonly body: object }
-  | { readonly status: 403 | 404 | 501; readonly body: OperatorError };
+  | { readonly status: 400 | 403 | 404 | 409 | 422 | 500 | 501; readonly body: OperatorError };
 
 export interface SessionSummary {
   readonly sessionId: string;
@@ -81,6 +83,7 @@ export interface OperatorRouterOptions {
     resume?(sessionId: string): SessionDetail | undefined | Promise<SessionDetail | undefined>;
     clear?(filter: { readonly serverId?: string; readonly agentId?: string }): number | Promise<number>;
   };
+  readonly serverLifecycle?: Pick<ServerLifecycleManager, "start" | "stop" | "restart">;
   readonly now?: () => number;
 }
 
@@ -97,9 +100,9 @@ export class OperatorRouter {
       ["session-list", () => this.sessionList()],
       ["session-resume-view", (command) => this.resume(command.args)],
       ["clear-session", (command) => this.clear(command.args)],
-      ["start", () => notImplemented("start")],
-      ["stop", () => notImplemented("stop")],
-      ["restart", () => notImplemented("restart")],
+      ["start", (command) => this.lifecycle("start", command.args)],
+      ["stop", (command) => this.lifecycle("stop", command.args)],
+      ["restart", (command) => this.lifecycle("restart", command.args)],
       ["chat", () => notImplemented("chat")],
       ["send-stdin", () => notImplemented("send-stdin")],
       ["config-edit", () => notImplemented("config-edit")],
@@ -152,6 +155,16 @@ export class OperatorRouter {
       agentId: readStringArg(args, "agentId"),
     };
     return ok({ cleared: await this.options.sessionStore?.clear?.(filter) ?? 0 });
+  }
+
+  private async lifecycle(action: "start" | "stop" | "restart", args: unknown): Promise<OperatorResponse> {
+    const serverId = readStringArg(args, "serverId");
+    if (serverId === undefined) return error(400, "MISSING_SERVER_ID", "No server was specified.");
+    const lifecycle = this.options.serverLifecycle;
+    if (lifecycle === undefined) return notImplemented(action);
+
+    const result = await lifecycle[action](serverId);
+    return lifecycleResponse(result);
   }
 }
 
@@ -279,8 +292,26 @@ function ok(body: object): OperatorResponse {
   return { status: 200, body };
 }
 
+function lifecycleResponse(result: LifecycleResult): OperatorResponse {
+  if (result.ok) return ok({ serverId: result.serverId, state: result.state, pid: result.pid });
+
+  const statuses: Record<LifecycleErrorCode, 404 | 409 | 422 | 500> = {
+    SERVER_NOT_FOUND: 404,
+    ALREADY_RUNNING: 409,
+    NOT_RUNNING: 409,
+    SERVER_PATH_NOT_FOUND: 422,
+    PATH_TRAVERSAL_BLOCKED: 422,
+    JAR_NOT_FOUND: 422,
+    JAVA_NOT_FOUND: 422,
+    PORT_CONFLICT: 422,
+    STARTUP_TIMEOUT: 422,
+    INTERNAL_ERROR: 500,
+  };
+  return error(statuses[result.code], result.code, result.message, result.details);
+}
+
 function error(
-  status: 403 | 404 | 501,
+  status: 400 | 403 | 404 | 409 | 422 | 500 | 501,
   code: string,
   message: string,
   details?: Record<string, unknown>,

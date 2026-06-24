@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun run --watch src/index.tsx",
     "check": "tsc --noEmit",
-    "test": "bun test ./tests/cli.test.ts ./tests/config.test.ts ./tests/domain.test.ts ./tests/lifecycle.test.ts ./tests/openapi.test.ts ./tests/persistence.test.ts ./tests/router.test.ts ./tests/telemetry.test.ts",
+    "test": "bun test ./tests/cli.test.ts ./tests/config.test.ts ./tests/domain.test.ts ./tests/lifecycle.test.ts ./tests/openapi.test.ts ./tests/persistence.test.ts ./tests/process.test.ts ./tests/router.test.ts ./tests/telemetry.test.ts",
     "build": "bun build src/index.tsx --target bun --outdir dist --external @opentui/core-darwin-x64 --external @opentui/core-darwin-arm64 --external @opentui/core-linux-x64 --external @opentui/core-linux-x64-musl --external @opentui/core-linux-arm64 --external @opentui/core-linux-arm64-musl --external @opentui/core-win32-arm64",
     "prettier": "npx prettier --write \"**/*.md\" \".agents/**/*.md\" \"src/**/*.{ts,tsx,js,jsx,json,css}\""
   },

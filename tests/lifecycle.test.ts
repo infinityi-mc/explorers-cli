@@ -56,10 +56,10 @@ describe("lifecycle", () => {
       const app = await bootExplorers({
         loaded: loaded.value,
         runtime: runtime.value,
-        shutdownTimeout: 1,
-        startTimeout: 100,
+        shutdownTimeout: 100,
+        startTimeout: 200,
         startTui: async () => {
-          await new Promise((resolve) => setTimeout(resolve, 20));
+          await new Promise((resolve) => setTimeout(resolve, 120));
           return () => {};
         },
         installSignals: false,
