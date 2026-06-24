@@ -303,23 +303,21 @@ async function waitForDoneAndIngest(
       }
     }
     reader.releaseLock();
-    if (foundDone && continueAfterDone) continueReading(stream, splitter, onLine);
+    if (foundDone && continueAfterDone) void continueReading(stream, splitter, onLine).catch(() => {});
   }
 }
 
-function continueReading(stream: ReadableStream<Uint8Array>, splitter: LineSplitter, onLine: (line: string) => void): void {
-  void (async () => {
-    const reader = stream.getReader();
-    try {
-      while (true) {
-        const next = await reader.read();
-        for (const line of next.done ? splitter.flush() : splitter.push(next.value)) onLine(line);
-        if (next.done) return;
-      }
-    } finally {
-      reader.releaseLock();
+async function continueReading(stream: ReadableStream<Uint8Array>, splitter: LineSplitter, onLine: (line: string) => void): Promise<void> {
+  const reader = stream.getReader();
+  try {
+    while (true) {
+      const next = await reader.read();
+      for (const line of next.done ? splitter.flush() : splitter.push(next.value)) onLine(line);
+      if (next.done) return;
     }
-  })();
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 function spawnJava({ server }: SpawnJavaRequest): ManagedChild {

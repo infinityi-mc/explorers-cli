@@ -40,7 +40,7 @@ export class ServerLogStore {
     if (stream === null || stream === undefined) return;
     void readLogStream(stream, (line) => {
       this.ingest(serverId, prefix.length === 0 ? line : `${prefix}${line}`);
-    });
+    }).catch(() => {});
   }
 
   snapshot(serverId: string, limit?: number): LogBufferSnapshot {
@@ -132,7 +132,7 @@ class LogRingBuffer {
   }
 
   snapshot(limit?: number): LogBufferSnapshot {
-    const lines = limit === undefined ? this.lines : this.lines.slice(-limit);
+    const lines = limit === undefined ? [...this.lines] : this.lines.slice(-limit);
     return {
       serverId: this.serverId,
       lines,

@@ -48,7 +48,7 @@ export function createAppViewModel(
     agentCount: Object.keys(loaded.config.agents).length,
     providerCount: Object.keys(loaded.config.providers).length,
     servers: serverIds.map((id) => serverItem(id, state)),
-    logs: selectedServer === undefined ? [] : state?.logStore?.snapshot(selectedServer, 12).lines.map((line) => line.text) ?? [],
+    logs: selectedServer === undefined ? [] : state?.logStore?.snapshot(selectedServer, 12)?.lines.map((line) => line.text) ?? [],
     banner: reloadBanner(state?.reloadOutcome),
   };
 }

@@ -48,4 +48,14 @@ describe("server log ingestion", () => {
     expect(snapshot.lines).toEqual([]);
     expect(snapshot.droppedBufferFull).toBe(1);
   });
+
+  test("snapshot does not expose mutable backing lines", () => {
+    const store = new ServerLogStore({ maxLinesPerSecond: 100 });
+    store.ingest("survival", "one");
+
+    const snapshot = store.snapshot("survival");
+    (snapshot.lines as unknown as { pop(): unknown }).pop();
+
+    expect(store.snapshot("survival").lines.map((line) => line.text)).toEqual(["one"]);
+  });
 });

@@ -81,7 +81,17 @@ export class HotReloadService {
 
   private debounce(): void {
     if (this.timer !== undefined) clearTimeout(this.timer);
-    this.timer = setTimeout(() => void this.reloadNow(), this.options.debounceMs ?? 200);
+    this.timer = setTimeout(() => {
+      void this.reloadNow().catch((error: unknown) => this.reportReloadFailure(error));
+    }, this.options.debounceMs ?? 200);
+  }
+
+  private reportReloadFailure(error: unknown): void {
+    const outcome = rejected([configIssue("config.yaml", errorMessage(error))], this.current, Date.now());
+    this.lastOutcome = outcome;
+    try {
+      this.options.onReload?.(outcome);
+    } catch {}
   }
 }
 
@@ -160,6 +170,10 @@ function diffValue(path: string, current: unknown, next: unknown, out: string[])
 
 function rejected(diagnostics: readonly ConfigDiagnostic[], kept: LoadedRuntimeConfig, started: number): ReloadOutcome {
   return { ok: false, diagnostics, kept, durationMs: Date.now() - started };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
