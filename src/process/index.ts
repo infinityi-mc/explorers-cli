@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
 import type { ServerConfig } from "../config/types";
 import type { ServerState } from "../domain";
+import { LineSplitter, type ServerLogStore } from "../log";
 import type { PidRegistry } from "../persistence";
 
 export const PROCESS_COMPONENT = "server-process-manager";
@@ -21,6 +22,7 @@ export interface ServerLifecycleManagerOptions {
   readonly spawn?: SpawnJava;
   readonly killPid?: KillPid;
   readonly portFree?: (port: number) => Promise<boolean>;
+  readonly logStore?: Pick<ServerLogStore, "attach" | "ingest">;
 }
 
 export type LifecycleResult =
@@ -115,8 +117,11 @@ export class ServerLifecycleManager {
       await this.options.pidRegistry.set(serverId, child.pid);
       this.watchExit(serverId, entry, child);
 
-      // startupTimeout is configured in seconds; waitForDone uses milliseconds.
-      const startup = await waitForDone(child.stdout, server.startupTimeout * 1000);
+      this.options.logStore?.attach(serverId, child.stderr, "[stderr] ");
+      // startupTimeout is configured in seconds; waitForDoneAndIngest uses milliseconds.
+      const startup = await waitForDoneAndIngest(child.stdout, server.startupTimeout * 1000, (line) => {
+        this.options.logStore?.ingest(serverId, line);
+      }, this.options.logStore !== undefined);
       if (!startup.ok) {
         entry.state = "FAILED";
         entry.lastError ??= "STARTUP_TIMEOUT";
@@ -263,12 +268,17 @@ export class ServerLifecycleManager {
   }
 }
 
-async function waitForDone(stream: ReadableStream<Uint8Array> | null, timeoutMs: number): Promise<{ readonly ok: true } | { readonly ok: false }> {
+async function waitForDoneAndIngest(
+  stream: ReadableStream<Uint8Array> | null,
+  timeoutMs: number,
+  onLine: (line: string) => void,
+  continueAfterDone: boolean,
+): Promise<{ readonly ok: true } | { readonly ok: false }> {
   if (stream === null) return { ok: false };
   const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+  const splitter = new LineSplitter();
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  let foundDone = false;
   const timeout = new Promise<"timeout">((resolve) => {
     timeoutHandle = setTimeout(() => resolve("timeout"), timeoutMs);
   });
@@ -277,20 +287,39 @@ async function waitForDone(stream: ReadableStream<Uint8Array> | null, timeoutMs:
     while (true) {
       const next = await Promise.race([reader.read(), timeout]);
       if (next === "timeout" || next.done) return { ok: false };
-      buffer += decoder.decode(next.value, { stream: true });
-      if (buffer.includes("Done!")) return { ok: true };
-      buffer = buffer.slice(-256);
+      for (const line of splitter.push(next.value)) {
+        onLine(line);
+        if (line.includes("Done!")) foundDone = true;
+      }
+      if (foundDone) return { ok: true };
     }
   } finally {
     if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+    if (!foundDone || !continueAfterDone) {
+      try {
+        await reader.cancel();
+      } catch {
+        // Startup outcome already decided; still release the stream lock below.
+      }
+    }
+    reader.releaseLock();
+    if (foundDone && continueAfterDone) continueReading(stream, splitter, onLine);
+  }
+}
+
+function continueReading(stream: ReadableStream<Uint8Array>, splitter: LineSplitter, onLine: (line: string) => void): void {
+  void (async () => {
+    const reader = stream.getReader();
     try {
-      await reader.cancel();
-    } catch {
-      // Startup outcome already decided; still release the stream lock below.
+      while (true) {
+        const next = await reader.read();
+        for (const line of next.done ? splitter.flush() : splitter.push(next.value)) onLine(line);
+        if (next.done) return;
+      }
     } finally {
       reader.releaseLock();
     }
-  }
+  })();
 }
 
 function spawnJava({ server }: SpawnJavaRequest): ManagedChild {

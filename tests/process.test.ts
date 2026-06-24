@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ServerConfig } from "../src/config/types";
+import { ServerLogStore } from "../src/log";
 import { ServerLifecycleManager, type ManagedChild } from "../src/process";
 
 describe("server lifecycle manager", () => {
@@ -474,6 +475,33 @@ describe("server lifecycle manager", () => {
     }
   });
 
+  test("continues ingesting stdout after startup", async () => {
+    const dir = tempDir();
+    try {
+      const stdout = controlledStdout();
+      const child = stubChild({ pid: 76, stdout: stdout.stream });
+      const logs = new ServerLogStore({ maxLinesPerSecond: 100 });
+      const manager = new ServerLifecycleManager({
+        servers: { survival: serverConfig(dir) },
+        pidRegistry: registry({}),
+        spawn: () => child,
+        portFree: async () => true,
+        logStore: logs,
+      });
+
+      const started = manager.start("survival");
+      stdout.write("Preparing\nDone!\n");
+      expect(await started).toMatchObject({ ok: true, state: "RUNNING" });
+      stdout.write("after startup\n");
+      await Bun.sleep(0);
+
+      expect(logs.snapshot("survival").lines.map((line) => line.text)).toContain("after startup");
+      stdout.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("default port check detects conflicts", async () => {
     const dir = tempDir();
     const socket = createServer();
@@ -523,7 +551,7 @@ function stubChild(options: { readonly pid: number; readonly stdout: string | Re
   };
 }
 
-function controlledStdout(): { readonly stream: ReadableStream<Uint8Array>; close(): void } {
+function controlledStdout(): { readonly stream: ReadableStream<Uint8Array>; write(text: string): void; close(): void } {
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
   return {
     stream: new ReadableStream<Uint8Array>({
@@ -531,6 +559,9 @@ function controlledStdout(): { readonly stream: ReadableStream<Uint8Array>; clos
         controller = next;
       },
     }),
+    write(text) {
+      controller?.enqueue(new TextEncoder().encode(text));
+    },
     close() {
       controller?.close();
     },
