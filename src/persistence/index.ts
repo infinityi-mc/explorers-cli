@@ -95,7 +95,11 @@ export async function startPersistence(options: {
             cleanupErrors.push(error);
           }
         } finally {
-          await releaseLock(lockPath).catch(() => {});
+          try {
+            await releaseLock(lockPath);
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
         }
         if (cleanupErrors.length > 0) throw new AggregateError(cleanupErrors, "Failed to stop persistence cleanly.");
       },
