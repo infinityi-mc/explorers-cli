@@ -155,9 +155,27 @@ async function acquireLock(path: string): Promise<void> {
     await file.close();
   } catch (error) {
     if (isFileExistsError(error)) {
+      if (await clearStaleLock(path)) return acquireLock(path);
       throw new Error(`LOCK_HELD: another explorers-cli instance owns ${path}`);
     }
     throw error;
+  }
+}
+
+async function clearStaleLock(path: string): Promise<boolean> {
+  const raw = await readFile(path, "utf8").catch(() => undefined);
+  const pid = raw === undefined ? undefined : Number.parseInt(raw, 10);
+  if (pid !== undefined && Number.isInteger(pid) && pid > 0 && isPidAlive(pid)) return false;
+  await rm(path, { force: true });
+  return true;
+}
+
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
   }
 }
 

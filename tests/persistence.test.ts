@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -46,6 +47,18 @@ describe("persistence", () => {
       } finally {
         await first.stop();
       }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("removes stale lock files left by crashed managers", async () => {
+    const dir = tempDir();
+    try {
+      await writeFile(join(dir, "explorers.lock"), "999999999\n", "utf8");
+
+      const state = await startPersistence({ dataDir: dir });
+      await state.stop();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
