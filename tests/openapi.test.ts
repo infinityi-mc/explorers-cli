@@ -11,5 +11,9 @@ describe("OpenAPI contract artifact", () => {
 
     expect(spec.openapi).toBe("3.1.0");
     expect(spec.paths?.["/operator/start"]).toBeDefined();
+    expect(spec.paths?.["/operator/chat"]).toBeDefined();
+    expect(spec.paths?.["/operator/session"]).toBeDefined();
+    expect(spec.paths?.["/operator/resume"]).toBeDefined();
+    expect(spec.paths?.["/operator/clear"]).toBeDefined();
   });
 });

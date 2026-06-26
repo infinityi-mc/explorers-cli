@@ -6,6 +6,7 @@ import {
 } from "@infinityi/forge/data/dialects/sqlite";
 import { forgeDataAuditLog } from "@infinityi/engine-lib/governance";
 import { ForgeDataSessionStore } from "@infinityi/engine-lib/session-stores";
+import type { SessionStore } from "@infinityi/engine-lib/session";
 import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Logger } from "@infinityi/forge/lifecycle";
@@ -18,6 +19,7 @@ export interface PersistenceState {
   readonly pidsPath: string;
   readonly dbPath: string;
   readonly pidRegistry: PidRegistry;
+  readonly sessionStore: SessionStore;
   readonly db: Db<Record<string, Record<string, unknown>>>;
   stop(): Promise<void>;
 }
@@ -42,7 +44,7 @@ export async function startPersistence(options: {
 
   const lockPath = join(options.dataDir, "explorers.lock");
   await acquireLock(lockPath);
-  let sessionStore: { close(): Promise<void>; migrate(): Promise<void> } | undefined;
+  let sessionStore: ForgeDataSessionStore | undefined;
   let db: Db<Record<string, Record<string, unknown>>> | undefined;
 
   try {
@@ -77,14 +79,29 @@ export async function startPersistence(options: {
       pidsPath,
       dbPath,
       pidRegistry,
+      sessionStore,
       db,
       async stop() {
+        const cleanupErrors: unknown[] = [];
         try {
-          await sessionStore?.close();
-          await db?.shutdown();
+          try {
+            await sessionStore?.close();
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
+          try {
+            await db?.shutdown();
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
         } finally {
-          await releaseLock(lockPath).catch(() => {});
+          try {
+            await releaseLock(lockPath);
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
         }
+        if (cleanupErrors.length > 0) throw new AggregateError(cleanupErrors, "Failed to stop persistence cleanly.");
       },
     };
   } catch (error) {

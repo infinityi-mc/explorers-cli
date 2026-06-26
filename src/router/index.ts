@@ -1,4 +1,5 @@
 import type { LifecycleErrorCode, LifecycleResult, ServerLifecycleManager } from "../process";
+import { AgentExecutorError, mapAgentExecutorError, type AgentExecutor, type AgentRunResponse } from "../agent";
 
 export const ROUTER_COMPONENT = "operator-router";
 
@@ -54,7 +55,7 @@ export interface OperatorError {
 
 export type OperatorResponse =
   | { readonly status: 200; readonly body: object }
-  | { readonly status: 400 | 403 | 404 | 409 | 422 | 500 | 501; readonly body: OperatorError };
+  | { readonly status: 400 | 403 | 404 | 409 | 422 | 429 | 500 | 501 | 503 | 504; readonly body: OperatorError };
 
 export interface SessionSummary {
   readonly sessionId: string;
@@ -84,6 +85,7 @@ export interface OperatorRouterOptions {
     clear?(filter: { readonly serverId?: string; readonly agentId?: string }): number | Promise<number>;
   };
   readonly serverLifecycle?: Pick<ServerLifecycleManager, "start" | "stop" | "restart">;
+  readonly agentExecutor?: Pick<AgentExecutor, "chat">;
   readonly now?: () => number;
 }
 
@@ -103,7 +105,7 @@ export class OperatorRouter {
       ["start", (command) => this.lifecycle("start", command.args)],
       ["stop", (command) => this.lifecycle("stop", command.args)],
       ["restart", (command) => this.lifecycle("restart", command.args)],
-      ["chat", () => notImplemented("chat")],
+      ["chat", (command) => this.chat(command.args)],
       ["send-stdin", () => notImplemented("send-stdin")],
       ["config-edit", () => notImplemented("config-edit")],
       ["log-view", async () => ok({})],
@@ -155,6 +157,23 @@ export class OperatorRouter {
       agentId: readStringArg(args, "agentId"),
     };
     return ok({ cleared: await this.options.sessionStore?.clear?.(filter) ?? 0 });
+  }
+
+  private async chat(args: unknown): Promise<OperatorResponse> {
+    const agentId = readStringArg(args, "agentId");
+    const message = readStringArg(args, "message");
+    if (agentId === undefined) return error(400, "MISSING_AGENT_ID", "No agent was specified.");
+    if (message === undefined || message.trim().length === 0) return error(400, "MISSING_MESSAGE", "No chat message was specified.");
+    const serverId = readStringArg(args, "serverId");
+    const executor = this.options.agentExecutor;
+    if (executor === undefined) return notImplemented("chat");
+
+    try {
+      const body: AgentRunResponse = await executor.chat({ ...(serverId !== undefined ? { serverId } : {}), agentId, message });
+      return ok(body);
+    } catch (cause) {
+      return agentErrorResponse(mapAgentExecutorError(cause));
+    }
   }
 
   private async lifecycle(action: "start" | "stop" | "restart", args: unknown): Promise<OperatorResponse> {
@@ -222,7 +241,12 @@ async function idempotencyCacheKey(command: ParsedCommand): Promise<string> {
 
 function parseArgs(command: OperatorCommand, rest: readonly string[]): unknown {
   if (["start", "stop", "restart"].includes(command)) return { serverId: rest[0] };
-  if (command === "chat") return { agentId: rest[0], message: rest.slice(1).join(" ") };
+  if (command === "chat") {
+    if (rest[0] === "--server") {
+      return rest.length > 3 ? { serverId: rest[1], agentId: rest[2], message: rest.slice(3).join(" ") } : { serverId: rest[1], agentId: rest[2] };
+    }
+    return rest.length > 1 ? { agentId: rest[0], message: rest.slice(1).join(" ") } : { agentId: rest[0] };
+  }
   if (command === "session-resume-view") return { sessionId: rest[0] };
   if (command === "clear-session") return { serverId: rest[0], agentId: rest[1] };
   return {};
@@ -310,8 +334,24 @@ function lifecycleResponse(result: LifecycleResult): OperatorResponse {
   return error(statuses[result.code], result.code, result.message, result.details);
 }
 
+function agentErrorResponse(agentError: AgentExecutorError): OperatorResponse {
+  const statuses: Record<AgentExecutorError["code"], 404 | 429 | 500 | 503 | 504> = {
+    AGENT_NOT_FOUND: 404,
+    SERVER_NOT_FOUND: 404,
+    PROVIDER_TIMEOUT: 504,
+    PROVIDER_UNAVAILABLE: 503,
+    PROVIDER_RATE_LIMITED: 429,
+    CONTEXT_WINDOW_EXCEEDED: 500,
+    MAX_STEPS_EXCEEDED: 500,
+    MAX_HANDOFFS_EXCEEDED: 500,
+    BUDGET_EXCEEDED: 500,
+    INTERNAL_ERROR: 500,
+  };
+  return error(statuses[agentError.code], agentError.code, agentError.message, agentError.details);
+}
+
 function error(
-  status: 400 | 403 | 404 | 409 | 422 | 500 | 501,
+  status: 400 | 403 | 404 | 409 | 422 | 429 | 500 | 501 | 503 | 504,
   code: string,
   message: string,
   details?: Record<string, unknown>,
