@@ -82,12 +82,22 @@ export async function startPersistence(options: {
       sessionStore,
       db,
       async stop() {
+        const cleanupErrors: unknown[] = [];
         try {
-          await sessionStore?.close().catch(() => {});
-          await db?.shutdown().catch(() => {});
+          try {
+            await sessionStore?.close();
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
+          try {
+            await db?.shutdown();
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
         } finally {
           await releaseLock(lockPath).catch(() => {});
         }
+        if (cleanupErrors.length > 0) throw new AggregateError(cleanupErrors, "Failed to stop persistence cleanly.");
       },
     };
   } catch (error) {

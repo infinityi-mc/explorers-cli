@@ -201,6 +201,25 @@ describe("operator router", () => {
     });
   });
 
+  test("rejects chat without a message before executor call", async () => {
+    let calls = 0;
+    const router = new OperatorRouter({
+      runtimeMode: "normal",
+      agentExecutor: {
+        chat: async () => {
+          calls++;
+          return { runId: "run", agentId: "assistant", stream: true, completed: "run://done" };
+        },
+      },
+    });
+
+    expect(await router.route(parseOperatorCommand("/chat assistant", "chat-key"))).toEqual({
+      status: 400,
+      body: { code: "MISSING_MESSAGE", message: "No chat message was specified." },
+    });
+    expect(calls).toBe(0);
+  });
+
   test("returns stable errors for missing sessions and absent later-phase handlers", async () => {
     const router = new OperatorRouter({
       runtimeMode: "normal",

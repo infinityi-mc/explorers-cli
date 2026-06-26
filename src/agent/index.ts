@@ -110,7 +110,7 @@ export class AgentExecutor {
 
     const runId = `run_${crypto.randomUUID()}`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), configAgent.timeout * 1_000);
+    const timeout = setTimeout(() => controller.abort(), configAgent.timeout);
     const partial: string[] = [];
     const handle = runAgent(agent, {
       runId,
@@ -146,7 +146,7 @@ export class AgentExecutor {
     return this.sessions.resume(sessionId);
   }
 
-  clear(filter: { readonly serverId?: string; readonly agentId?: string }): number {
+  clear(filter: { readonly serverId?: string; readonly agentId?: string }): Promise<number> {
     return this.sessions.clear(filter);
   }
 
@@ -162,8 +162,15 @@ export class AgentExecutor {
       const result = await handle.completed;
       this.runs.set(runId, { status: "completed", output: result.output });
     } catch (error) {
-      if (isAbortError(error) && partial.length > 0) await session.append([assistantMessage(partial.join(""))]);
-      this.runs.set(runId, { status: "failed", error: mapAgentExecutorError(error) });
+      const mapped = mapAgentExecutorError(error);
+      this.runs.set(runId, { status: "failed", error: mapped });
+      if (isAbortError(error) && partial.length > 0) {
+        try {
+          await session.append([assistantMessage(partial.join(""))]);
+        } catch {
+          // Best-effort only; terminal run state must stay accurate.
+        }
+      }
     } finally {
       clearTimeout(timeout);
       this.handles.delete(runId);
@@ -222,16 +229,25 @@ class SharedSessionManager {
     return { sessionId, serverId: parsed.serverId, agentId: parsed.agentId, messages: state.messages.map((message) => sessionMessage(message, timestamp)) };
   }
 
-  clear(filter: { readonly serverId?: string; readonly agentId?: string }): number {
-    let cleared = 0;
+  async clear(filter: { readonly serverId?: string; readonly agentId?: string }): Promise<number> {
+    const cleared = new Set<string>();
     for (const id of Array.from(this.cache.keys())) {
       const parsed = parseSessionId(id);
       if (filter.serverId !== undefined && parsed.serverId !== filter.serverId) continue;
       if (filter.agentId !== undefined && parsed.agentId !== filter.agentId) continue;
       this.cache.delete(id);
-      cleared++;
+      cleared.add(id);
     }
-    return cleared;
+    const prefix = filter.serverId !== undefined && filter.agentId !== undefined ? sessionPrefix(filter.serverId, filter.agentId) : undefined;
+    const page = await this.store.list({ ...(prefix !== undefined ? { prefix } : {}), ...(filter.serverId !== undefined ? { tenantId: filter.serverId } : {}), limit: 200, order: "recent" });
+    for (const session of page.sessions) {
+      const parsed = parseSessionId(session.id);
+      if (filter.serverId !== undefined && parsed.serverId !== filter.serverId) continue;
+      if (filter.agentId !== undefined && parsed.agentId !== filter.agentId) continue;
+      await this.store.delete(session.id);
+      cleared.add(session.id);
+    }
+    return cleared.size;
   }
 
   private cacheSession(session: Session): Session {

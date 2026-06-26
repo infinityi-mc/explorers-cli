@@ -45,7 +45,7 @@ describe("agent executor", () => {
     expect(await executor.list()).toEqual([]);
   });
 
-  test("clear drops cached handle only", async () => {
+  test("clear resets persisted session boundary", async () => {
     const store = new InMemorySessionStore();
     const executor = new AgentExecutor({
       config: fixtureConfig(),
@@ -58,11 +58,13 @@ describe("agent executor", () => {
     await executor.runHandle(first.runId)?.completed;
     const oldId = (await executor.list())[0]!.sessionId;
 
-    expect(executor.clear({ serverId: "survival", agentId: "assistant" })).toBe(1);
+    expect(await executor.clear({ serverId: "survival", agentId: "assistant" })).toBe(1);
     const second = await executor.chat({ serverId: "survival", agentId: "assistant", message: "two" });
     await executor.runHandle(second.runId)?.completed;
 
-    expect((await executor.list()).map((session) => session.sessionId)).toContain(oldId);
+    const ids = (await executor.list()).map((session) => session.sessionId);
+    expect(ids).toHaveLength(1);
+    expect(ids[0]).not.toBe(oldId);
   });
 
   test("maps provider errors to stable operator codes", () => {

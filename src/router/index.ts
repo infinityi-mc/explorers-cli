@@ -163,7 +163,7 @@ export class OperatorRouter {
     const agentId = readStringArg(args, "agentId");
     const message = readStringArg(args, "message");
     if (agentId === undefined) return error(400, "MISSING_AGENT_ID", "No agent was specified.");
-    if (message === undefined) return error(400, "MISSING_MESSAGE", "No chat message was specified.");
+    if (message === undefined || message.trim().length === 0) return error(400, "MISSING_MESSAGE", "No chat message was specified.");
     const serverId = readStringArg(args, "serverId");
     const executor = this.options.agentExecutor;
     if (executor === undefined) return notImplemented("chat");
@@ -242,8 +242,10 @@ async function idempotencyCacheKey(command: ParsedCommand): Promise<string> {
 function parseArgs(command: OperatorCommand, rest: readonly string[]): unknown {
   if (["start", "stop", "restart"].includes(command)) return { serverId: rest[0] };
   if (command === "chat") {
-    if (rest[0] === "--server") return { serverId: rest[1], agentId: rest[2], message: rest.slice(3).join(" ") };
-    return { agentId: rest[0], message: rest.slice(1).join(" ") };
+    if (rest[0] === "--server") {
+      return rest.length > 3 ? { serverId: rest[1], agentId: rest[2], message: rest.slice(3).join(" ") } : { serverId: rest[1], agentId: rest[2] };
+    }
+    return rest.length > 1 ? { agentId: rest[0], message: rest.slice(1).join(" ") } : { agentId: rest[0] };
   }
   if (command === "session-resume-view") return { sessionId: rest[0] };
   if (command === "clear-session") return { serverId: rest[0], agentId: rest[1] };
