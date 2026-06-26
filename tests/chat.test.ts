@@ -10,6 +10,7 @@ describe("chat parser", () => {
       line: "[12:34:56] [Server thread/INFO]: <Steve> @bot hello",
       config,
       now: fixedNow,
+      limiter: new ChatRateLimiterRegistry(fixedNow),
     });
 
     expect(result).toEqual({
@@ -48,6 +49,13 @@ describe("chat parser", () => {
     expect(result).toMatchObject({ kind: "mention", mention: { agentId: "builder", message: "first @bot second" } });
   });
 
+  test("does not match aliases inside longer mention tokens", () => {
+    expect(parse("[12:34:56] [Server thread/INFO]: <Steve> @bottle hello @bot valid")).toMatchObject({
+      kind: "mention",
+      mention: { agentId: "assistant", message: "valid" },
+    });
+  });
+
   test("returns help trigger with permitted agents", () => {
     expect(parse("[12:34:57] [Server thread/INFO]: <Steve> !help")).toMatchObject({
       kind: "help_trigger",
@@ -69,6 +77,7 @@ describe("chat parser", () => {
       line: "[12:34:56] [Server thread/INFO]: <Alex> @bot secret text",
       config: fixtureConfig(),
       now: fixedNow,
+      limiter: new ChatRateLimiterRegistry(fixedNow),
       audit: (event) => audit.push(event),
     });
 
@@ -134,8 +143,8 @@ describe("chat parser", () => {
       rateLimitUtilization: (_serverId, agentId, playerName, ratio) => events.push(`util:${agentId}:${playerName}:${ratio}`),
     };
 
-    parseIngameChatLine({ serverId: "survival", line: "[12:34:56] [Server thread/INFO]: <Steve> @bot hello", config: fixtureConfig(), now: fixedNow, metrics });
-    parseIngameChatLine({ serverId: "survival", line: "[12:34:56] [Server thread/INFO]: <Alex> @bot hello", config: fixtureConfig(), now: fixedNow, metrics });
+    parseIngameChatLine({ serverId: "survival", line: "[12:34:56] [Server thread/INFO]: <Steve> @bot hello", config: fixtureConfig(), now: fixedNow, limiter: new ChatRateLimiterRegistry(fixedNow), metrics });
+    parseIngameChatLine({ serverId: "survival", line: "[12:34:56] [Server thread/INFO]: <Alex> @bot hello", config: fixtureConfig(), now: fixedNow, limiter: new ChatRateLimiterRegistry(fixedNow), metrics });
 
     expect(events).toContain("parsed:mention");
     expect(events).toContain("authorized:assistant");
@@ -145,7 +154,7 @@ describe("chat parser", () => {
 });
 
 function parse(line: string, config = fixtureConfig()) {
-  return parseIngameChatLine({ serverId: "survival", line, config, indexes: rebuildRuntimeIndexes(config), now: fixedNow });
+  return parseIngameChatLine({ serverId: "survival", line, config, indexes: rebuildRuntimeIndexes(config), limiter: new ChatRateLimiterRegistry(fixedNow), now: fixedNow });
 }
 
 function parseWithLimiter(line: string, config: RuntimeConfig, limiter: ChatRateLimiterRegistry, now: () => number) {

@@ -133,7 +133,8 @@ export class ChatRateLimiterRegistry {
   acquire(serverId: string, agent: AgentConfig, playerName: string): { readonly allowed: boolean; readonly utilization: number } {
     const key = `${serverId}:${agent.id}:${playerName.toLowerCase()}`;
     const now = this.now();
-    if ((this.cooldownUntil.get(key) ?? 0) > now) return { allowed: false, utilization: this.utilization(key, agent.rateLimit.rpm) };
+    this.pruneIdle(key, now);
+    if ((this.cooldownUntil.get(key) ?? 0) > now) return { allowed: false, utilization: this.utilization(key) };
 
     const bucket = this.bucket(key, agent.rateLimit.rpm);
     const allowed = bucket.acquire(now);
@@ -149,8 +150,17 @@ export class ChatRateLimiterRegistry {
     return next;
   }
 
-  private utilization(key: string, rpm: number): number {
+  private utilization(key: string): number {
     return this.buckets.get(key)?.utilization(this.now()) ?? 0;
+  }
+
+  private pruneIdle(key: string, now: number): void {
+    const bucket = this.buckets.get(key);
+    const cooldownExpired = (this.cooldownUntil.get(key) ?? 0) <= now;
+    if (bucket?.isEmpty(now) === true && cooldownExpired) {
+      this.buckets.delete(key);
+      this.cooldownUntil.delete(key);
+    }
   }
 }
 
@@ -169,6 +179,11 @@ class SlidingWindowBucket {
   utilization(now: number): number {
     this.prune(now);
     return this.limit <= 0 ? 1 : Math.min(1, this.hits.length / this.limit);
+  }
+
+  isEmpty(now: number): boolean {
+    this.prune(now);
+    return this.hits.length === 0;
   }
 
   private prune(now: number): void {
@@ -190,11 +205,23 @@ function findFirstMention(message: string, agents: readonly AgentConfig[]): { re
   let selected: { readonly agent: AgentConfig; readonly index: number; readonly token: string } | undefined;
   for (const agent of agents) {
     const token = `@${agent.alias}`;
-    const index = message.indexOf(token);
+    const index = mentionIndex(message, token);
     if (index === -1) continue;
     if (selected === undefined || index < selected.index) selected = { agent, index, token };
   }
   return selected;
+}
+
+function mentionIndex(message: string, token: string): number {
+  let from = 0;
+  while (from < message.length) {
+    const index = message.indexOf(token, from);
+    if (index === -1) return -1;
+    const next = message[index + token.length];
+    if (next === undefined || !/[a-zA-Z0-9_-]/.test(next)) return index;
+    from = index + token.length;
+  }
+  return -1;
 }
 
 function permittedAgents(player: PlayerConfig | undefined, config: RuntimeConfig): readonly string[] {
