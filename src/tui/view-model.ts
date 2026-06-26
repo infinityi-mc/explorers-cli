@@ -2,6 +2,7 @@ import type { LoadedRuntimeConfig, RuntimeOptions } from "../config";
 import type { ReloadOutcome } from "../config/hot-reload";
 import type { ServerRuntimeSnapshot } from "../process";
 import type { ServerLogStore } from "../log";
+import type { OperatorResponse, ParsedCommand } from "../router";
 
 export interface AppViewModel {
   readonly title: string;
@@ -14,6 +15,7 @@ export interface AppViewModel {
   readonly servers: readonly ServerPanelItem[];
   readonly logs: readonly string[];
   readonly banner?: string;
+  readonly routeCommand?: (command: ParsedCommand) => Promise<OperatorResponse>;
 }
 
 export interface ServerPanelItem {
@@ -35,6 +37,7 @@ export function createAppViewModel(
     readonly logStore?: Pick<ServerLogStore, "snapshot">;
     readonly pendingRestart?: ReadonlySet<string>;
     readonly reloadOutcome?: ReloadOutcome;
+    readonly routeCommand?: (command: ParsedCommand) => Promise<OperatorResponse>;
   },
 ): AppViewModel {
   const serverIds = Object.keys(loaded.config.servers);
@@ -50,6 +53,7 @@ export function createAppViewModel(
     servers: serverIds.map((id) => serverItem(id, state)),
     logs: selectedServer === undefined ? [] : state?.logStore?.snapshot(selectedServer, 12)?.lines.map((line) => line.text) ?? [],
     banner: reloadBanner(state?.reloadOutcome),
+    routeCommand: state?.routeCommand,
   };
 }
 

@@ -26,6 +26,11 @@ export interface AgentRunResponse {
   readonly completed: string;
 }
 
+export type AgentRunTerminalState =
+  | { readonly status: "running" }
+  | { readonly status: "completed"; readonly output: string }
+  | { readonly status: "failed"; readonly error: AgentExecutorError };
+
 export interface SessionSummary {
   readonly sessionId: string;
   readonly serverId: string;
@@ -79,6 +84,7 @@ export class AgentExecutorError extends Error {
 export class AgentExecutor {
   private readonly agents = new Map<string, AgentDefinition>();
   private readonly handles = new Map<string, RunHandle>();
+  private readonly runs = new Map<string, AgentRunTerminalState>();
   private readonly sessions: SharedSessionManager;
   private readonly providers: Readonly<Record<string, Provider>>;
 
@@ -119,12 +125,17 @@ export class AgentExecutor {
       },
     });
     this.handles.set(runId, handle);
+    this.runs.set(runId, { status: "running" });
     void this.finalizeRun(runId, handle, session, partial, timeout);
     return { runId, agentId: input.agentId, stream: true, completed: `run://${runId}/completed` };
   }
 
   runHandle(runId: string): RunHandle | undefined {
     return this.handles.get(runId);
+  }
+
+  runState(runId: string): AgentRunTerminalState | undefined {
+    return this.runs.get(runId);
   }
 
   async list(): Promise<readonly SessionSummary[]> {
@@ -148,9 +159,11 @@ export class AgentExecutor {
   private async finalizeRun(runId: string, handle: RunHandle, session: Session, partial: readonly string[], timeout: ReturnType<typeof setTimeout>): Promise<void> {
     try {
       for await (const _event of handle) {}
-      await handle.completed;
+      const result = await handle.completed;
+      this.runs.set(runId, { status: "completed", output: result.output });
     } catch (error) {
       if (isAbortError(error) && partial.length > 0) await session.append([assistantMessage(partial.join(""))]);
+      this.runs.set(runId, { status: "failed", error: mapAgentExecutorError(error) });
     } finally {
       clearTimeout(timeout);
       this.handles.delete(runId);

@@ -23,6 +23,8 @@ describe("lifecycle", () => {
         runtime: runtime.value,
         startTui: async (viewModel) => {
           events.push(`tui:start:${viewModel.serverCount}`);
+          expect(viewModel.routeCommand).toBeDefined();
+          expect(await viewModel.routeCommand?.({ command: "session-list", args: {} })).toEqual({ status: 200, body: { items: [] } });
           return () => events.push("tui:stop");
         },
         installSignals: false,

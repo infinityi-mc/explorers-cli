@@ -8,7 +8,7 @@ import {
   type Logger,
 } from "@infinityi/forge/lifecycle";
 import { dirname, join } from "node:path";
-import { AGENT_COMPONENT } from "../agent";
+import { AGENT_COMPONENT, AgentExecutor } from "../agent";
 import { CHAT_COMPONENT } from "../chat";
 import type { LoadedRuntimeConfig, RuntimeOptions } from "../config";
 import { LOG_COMPONENT } from "../log";
@@ -18,7 +18,7 @@ import {
   type PersistenceState,
 } from "../persistence";
 import { PROCESS_COMPONENT } from "../process";
-import { ROUTER_COMPONENT } from "../router";
+import { OperatorRouter, ROUTER_COMPONENT } from "../router";
 import { TOOLS_COMPONENT } from "../tools";
 import { createAppViewModel, type StartTui, type StopTui } from "../tui";
 
@@ -52,6 +52,8 @@ export function createFoundationComponents(
 ): Component[] {
   let stopTui: StopTui | undefined;
   let persistence: PersistenceState | undefined;
+  let agentExecutor: AgentExecutor | undefined;
+  let router: OperatorRouter | undefined;
 
   return [
     asComponent("config", {
@@ -77,16 +79,44 @@ export function createFoundationComponents(
         persistence = undefined;
       },
     }),
-    asComponent(ROUTER_COMPONENT),
     asComponent(PROCESS_COMPONENT),
     asComponent(LOG_COMPONENT),
     asComponent(CHAT_COMPONENT),
-    asComponent(AGENT_COMPONENT),
+    asComponent(AGENT_COMPONENT, {
+      start: () => {
+        if (persistence === undefined) throw new Error("persistence must start before agent executor");
+        try {
+          agentExecutor = new AgentExecutor({ config: options.loaded.config, sessionStore: persistence.sessionStore });
+        } catch (error) {
+          throw error instanceof Error ? error : new Error(String(error));
+        }
+      },
+      stop: () => {
+        agentExecutor = undefined;
+      },
+    }),
+    asComponent(ROUTER_COMPONENT, {
+      start: () => {
+        router = new OperatorRouter({
+          runtimeMode: options.runtime.mode,
+          sessionStore: agentExecutor,
+          agentExecutor,
+        });
+      },
+      stop: () => {
+        router = undefined;
+      },
+    }),
     asComponent(TOOLS_COMPONENT),
     asComponent("tui", {
       start: async () => {
         stopTui = await options.startTui(
-          createAppViewModel(options.loaded, options.runtime),
+          createAppViewModel(options.loaded, options.runtime, {
+            routeCommand: (command) => {
+              if (router === undefined) throw new Error("operator router is not started");
+              return router.route(command);
+            },
+          }),
         );
       },
       stop: async () => {

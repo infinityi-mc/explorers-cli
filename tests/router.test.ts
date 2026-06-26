@@ -193,6 +193,14 @@ describe("operator router", () => {
     expect(calls).toBe(1);
   });
 
+  test("parses explicit server chat syntax", () => {
+    expect(parseOperatorCommand("/chat --server survival assistant hello there")).toEqual({
+      command: "chat",
+      args: { serverId: "survival", agentId: "assistant", message: "hello there" },
+      idempotencyKey: undefined,
+    });
+  });
+
   test("returns stable errors for missing sessions and absent later-phase handlers", async () => {
     const router = new OperatorRouter({
       runtimeMode: "normal",

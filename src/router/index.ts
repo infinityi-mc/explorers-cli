@@ -241,7 +241,10 @@ async function idempotencyCacheKey(command: ParsedCommand): Promise<string> {
 
 function parseArgs(command: OperatorCommand, rest: readonly string[]): unknown {
   if (["start", "stop", "restart"].includes(command)) return { serverId: rest[0] };
-  if (command === "chat") return { agentId: rest[0], message: rest.slice(1).join(" ") };
+  if (command === "chat") {
+    if (rest[0] === "--server") return { serverId: rest[1], agentId: rest[2], message: rest.slice(3).join(" ") };
+    return { agentId: rest[0], message: rest.slice(1).join(" ") };
+  }
   if (command === "session-resume-view") return { sessionId: rest[0] };
   if (command === "clear-session") return { serverId: rest[0], agentId: rest[1] };
   return {};

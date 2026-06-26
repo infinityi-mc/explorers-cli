@@ -4,6 +4,7 @@ import { InMemorySessionStore } from "@infinityi/engine-lib/session";
 import { mockProvider } from "@infinityi/engine-lib/testing";
 import { AgentExecutor, mapAgentExecutorError } from "../src/agent";
 import type { RuntimeConfig } from "../src/config";
+import type { Provider } from "@infinityi/engine-lib/providers";
 
 describe("agent executor", () => {
   test("online chat streams and persists shared session turns", async () => {
@@ -68,7 +69,44 @@ describe("agent executor", () => {
     expect(mapAgentExecutorError(new ProviderError("busy", { status: 429 })).code).toBe("PROVIDER_RATE_LIMITED");
     expect(mapAgentExecutorError(new ProviderError("down", { status: 503 })).code).toBe("PROVIDER_UNAVAILABLE");
   });
+
+  test("records failed terminal run state", async () => {
+    const executor = new AgentExecutor({
+      config: fixtureConfig(),
+      providers: { mock: failingProvider(new ProviderError("busy", { status: 429 })) },
+    });
+
+    const run = await executor.chat({ agentId: "assistant", message: "hi" });
+    await eventually(() => executor.runState(run.runId)?.status === "failed");
+
+    const state = executor.runState(run.runId);
+    expect(state?.status).toBe("failed");
+    expect(state?.status === "failed" ? state.error.code : undefined).toBe("PROVIDER_RATE_LIMITED");
+    expect(executor.runHandle(run.runId)).toBeUndefined();
+  });
 });
+
+function failingProvider(error: Error): Provider {
+  return {
+    name: "mock",
+    defaultModel: "mock-model",
+    capabilities: { tools: true, streaming: true, multimodalInput: false, parallelToolCalls: false, structuredOutput: false },
+    async complete() {
+      throw error;
+    },
+    async *stream() {
+      throw error;
+    },
+  };
+}
+
+async function eventually(check: () => boolean): Promise<void> {
+  for (let i = 0; i < 20; i++) {
+    if (check()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  expect(check()).toBe(true);
+}
 
 function fixtureConfig(): RuntimeConfig {
   return {
