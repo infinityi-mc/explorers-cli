@@ -173,6 +173,26 @@ describe("operator router", () => {
     expect(calls).toEqual(["start:survival", "stop:survival", "restart:survival"]);
   });
 
+  test("routes chat commands to the agent executor and replays run handle", async () => {
+    let calls = 0;
+    const router = new OperatorRouter({
+      runtimeMode: "normal",
+      agentExecutor: {
+        chat: async (input) => {
+          calls++;
+          return { runId: `run-${input.agentId}-${input.message}`, agentId: input.agentId, stream: true, completed: "run://done" };
+        },
+      },
+    });
+
+    const first = await router.route(parseOperatorCommand("/chat assistant hello there", "chat-key"));
+    const second = await router.route(parseOperatorCommand("/chat assistant different", "chat-key"));
+
+    expect(first).toEqual({ status: 200, body: { runId: "run-assistant-hello there", agentId: "assistant", stream: true, completed: "run://done" } });
+    expect(second).toEqual(first);
+    expect(calls).toBe(1);
+  });
+
   test("returns stable errors for missing sessions and absent later-phase handlers", async () => {
     const router = new OperatorRouter({
       runtimeMode: "normal",
@@ -189,9 +209,9 @@ describe("operator router", () => {
       },
     });
 
-    const placeholder = await router.route(parseOperatorCommand("/chat assistant hello", "chat-key"));
-    expect(placeholder.status).toBe(501);
-    expect("code" in placeholder.body ? placeholder.body.code : undefined).toBe("NOT_IMPLEMENTED");
+    const missingChatExecutor = await router.route(parseOperatorCommand("/chat assistant hello", "chat-key"));
+    expect(missingChatExecutor.status).toBe(501);
+    expect("code" in missingChatExecutor.body ? missingChatExecutor.body.code : undefined).toBe("NOT_IMPLEMENTED");
 
     const missingServer = await router.route(parseOperatorCommand("/start", "missing-server-key"));
     expect(missingServer).toEqual({
