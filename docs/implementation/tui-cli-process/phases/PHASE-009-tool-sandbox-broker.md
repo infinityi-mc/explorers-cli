@@ -1,6 +1,6 @@
 # PHASE-009 - Tool Sandbox Broker
 
-**Status**: Planned  
+**Status**: In Progress
 **Goal**: Register the v1 agent tools and enforce command/file sandbox policies with contract and audit evidence.  
 **Depends on**: PHASE-007, PHASE-008  
 **LLD sources**: `design.md` Tool Sandbox Broker mapping; `api.md` Agent tools; `openapi.yaml` `/agent-tools/*`; `sequences.md` section 6; `errors.md` tool codes; `observability.md` `tool_blocked`; ADR-LLD-001; `tests.md` Security scenarios  
@@ -9,7 +9,7 @@
 ## Scope
 
 - Register `run_command`, `read_file`, and `write_file` tool schemas through engine-lib tool packs.
-- Configure `tools-shell` with per-agent token-prefix command allowlists and server-state checks.
+- Configure the Minecraft console command adapter with per-agent token-prefix command allowlists and server-state checks.
 - Configure `tools-fs` with per-server `allowedRoots`, symlink containment, and running-server NBT deny rules.
 - Compose governance policies and role/tool authorization.
 - Audit tool success, blocked, and failed outcomes with redacted target and argument digests.
@@ -25,7 +25,7 @@
 
 | Unit ID | Type          | Summary                                                                                                   | Source                              | Risk   |
 | ------- | ------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------ |
-| IU-031  | security      | Register shell/fs tools with per-server roots, command allowlists, NBT deny rules, and server-state gate. | `design.md` Tool Sandbox Broker row | High   |
+| IU-031  | security      | Register Minecraft console/fs tools with per-server roots, command allowlists, NBT deny rules, and server-state gate. | `design.md` Tool Sandbox Broker row | High   |
 | IU-032  | contract      | Validate `run_command`, `read_file`, and `write_file` schemas and ToolResult contract.                    | `openapi.yaml` AgentTools           | Medium |
 | IU-033  | observability | Audit tool success, blocked, and failed outcomes with redacted targets and argument digests.              | `data-model.md` `audit_entries`     | Medium |
 | IU-034  | test          | Cover tool sandbox security cases.                                                                        | `tests.md` Security scenarios       | High   |
@@ -33,12 +33,12 @@
 ## Work Items
 
 1. Create a per-server/per-agent tool factory that consumes current config and Server Process Manager state.
-2. Register `run_command` through `engine-lib/tools-shell` with exact token-prefix allowlist semantics.
+2. Register `run_command` as a Minecraft console command tool with exact token-prefix allowlist semantics.
 3. Return `OFFLINE_FAIL` for command execution when the target server is not RUNNING.
-4. Register `read_file` and `write_file` through `engine-lib/tools-fs` with `allowedRoots:[server.path]`.
-5. Enforce symlink escape and cross-server path denial through engine-lib filesystem policies.
+4. Register `read_file` and `write_file` with `defineTool` and direct filesystem access inside `server.path`.
+5. Enforce symlink escape and cross-server path denial with canonical path containment checks.
 6. Add custom deny rule for `.nbt`, `.dat`, `.mca`, and `.schem` writes while server is RUNNING.
-7. Compose shell and filesystem policies through engine-lib governance.
+7. Record tool outcomes through `auditLog.record()` with redacted targets and argument digests.
 8. Attach tools to agent definitions and ensure provider-advertised schemas match `openapi.yaml`.
 9. Return recoverable ToolFailure for domain denials and throw only for unexpected implementation faults.
 10. Emit audit entries for `command_exec`, `file_read`, and `file_write` with redacted target and `argumentsDigest`.
@@ -46,14 +46,15 @@
 
 ## Data And Deployment Notes
 
+- `run_command` sends allowed Minecraft console commands to the target server stdin; it must not execute host OS shell commands.
 - Tool denials must fail closed and should not mutate filesystem or server stdin.
 - Audit rows are append-only and retained indefinitely.
 - Rollback removes tool registration from agent definitions; agent chat still works without tools.
 
 ## Tests And Verification
 
-- Unit tests: command tokenizer/prefix matching, NBT deny list, ToolResult mapping.
-- Integration tests: real temp filesystem sandbox, stub server stdin for allowed `run_command`, symlink and cross-root denial, offline failure.
+- Unit tests: Minecraft command tokenizer/prefix matching, NBT deny list, ToolResult mapping.
+- Integration tests: real temp filesystem sandbox, stub Minecraft server stdin for allowed `run_command`, symlink and cross-root denial, offline failure.
 - Contract tests: tool argument schemas and ToolResult validate against OpenAPI.
 - End-to-end or smoke tests: agent tries blocked command then allowed command using mock provider tool-call script.
 - Manual checks: audit rows for blocked and allowed tool calls include digests and no secrets.

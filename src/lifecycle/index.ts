@@ -20,7 +20,7 @@ import {
 } from "../persistence";
 import { PROCESS_COMPONENT, ServerLifecycleManager } from "../process";
 import { OperatorRouter, ROUTER_COMPONENT } from "../router";
-import { TOOLS_COMPONENT } from "../tools";
+import { TOOLS_COMPONENT, ToolSandboxBroker } from "../tools";
 import { createAppViewModel, type StartTui, type StopTui } from "../tui";
 
 export interface BootExplorersOptions {
@@ -56,6 +56,7 @@ export function createFoundationComponents(
   let agentExecutor: AgentExecutor | undefined;
   let router: OperatorRouter | undefined;
   let processManager: ServerLifecycleManager | undefined;
+  let toolBroker: ToolSandboxBroker | undefined;
   let logStore: ServerLogStore | undefined;
   let mentionRouter: MentionRouter | undefined;
 
@@ -100,12 +101,31 @@ export function createFoundationComponents(
         processManager = undefined;
       },
     }),
+    asComponent(TOOLS_COMPONENT, {
+      start: () => {
+        if (persistence === undefined) throw new Error("persistence must start before tool broker");
+        if (processManager === undefined) throw new Error("process manager must start before tool broker");
+        toolBroker = new ToolSandboxBroker({
+          config: options.loaded.config,
+          lifecycle: processManager,
+          auditLog: persistence.auditLog,
+        });
+      },
+      stop: () => {
+        toolBroker = undefined;
+      },
+    }),
     asComponent(CHAT_COMPONENT),
     asComponent(AGENT_COMPONENT, {
       start: () => {
         if (persistence === undefined) throw new Error("persistence must start before agent executor");
+        if (toolBroker === undefined) throw new Error("tool broker must start before agent executor");
         try {
-          agentExecutor = new AgentExecutor({ config: options.loaded.config, sessionStore: persistence.sessionStore });
+          agentExecutor = new AgentExecutor({
+            config: options.loaded.config,
+            sessionStore: persistence.sessionStore,
+            toolsFor: (input) => toolBroker!.toolsFor(input),
+          });
         } catch (error) {
           throw error instanceof Error ? error : new Error(String(error));
         }
@@ -143,7 +163,6 @@ export function createFoundationComponents(
         router = undefined;
       },
     }),
-    asComponent(TOOLS_COMPONENT),
     asComponent("tui", {
       start: async () => {
         stopTui = await options.startTui(
