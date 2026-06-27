@@ -45,10 +45,11 @@ describe("server lifecycle manager", () => {
         killPid: async () => {},
       });
 
-      await manager.start("survival");
+      expect(await manager.start("survival")).toMatchObject({ ok: true });
       const result = await manager.sendCommand("survival", "/say hi\n/op Steve");
 
       expect(result.ok).toBe(false);
+      expect(result).toMatchObject({ ok: false, code: "INTERNAL_ERROR" });
       expect(stdin).toBe("");
       child.resolveExit(0);
     } finally {
