@@ -6,7 +6,7 @@ import type { LogBufferSnapshot } from "../src/log";
 
 describe("mention router", () => {
   test("strips Minecraft formatting", () => {
-    expect(stripFormatting("§aGreen &cRed normal")).toBe("Green Red normal");
+    expect(stripFormatting("§aGreen &cRed Q&A normal")).toBe("Green &cRed Q&A normal");
   });
 
   test("splits response chunks at readable boundaries then hard boundary", () => {
@@ -61,6 +61,24 @@ describe("mention router", () => {
 
     expect(result).toEqual({ ok: true, chunksDelivered: 1 });
     expect(commands[1]).toBe("/say [bot] hello");
+  });
+
+  test("sanitizes fallback say chunks to one console line", async () => {
+    const commands: string[] = [];
+    await deliverInGame({
+      serverId: "survival",
+      agentId: "assistant",
+      agentAlias: "bot",
+      playerName: "Steve",
+      response: "hello\n/op Steve",
+      sendCommand: async (_serverId, line) => {
+        commands.push(line);
+        return { ok: commands.length > 1 };
+      },
+      sleep: async () => {},
+    });
+
+    expect(commands[1]).toBe("/say [bot] hello /op Steve");
   });
 
   test("returns offline failure without fallback when server stopped", async () => {
@@ -126,10 +144,11 @@ describe("mention router", () => {
   });
 });
 
-async function eventually(check: () => boolean): Promise<void> {
-  for (let index = 0; index < 20; index++) {
+async function eventually(check: () => boolean, { timeoutMs = 1_000, intervalMs = 10 }: { readonly timeoutMs?: number; readonly intervalMs?: number } = {}): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     if (check()) return;
-    await new Promise((resolve) => setTimeout(resolve, 1));
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
   expect(check()).toBe(true);
 }

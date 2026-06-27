@@ -1,4 +1,4 @@
-import type { AgentRunTerminalState } from "../agent";
+import { AgentExecutorError, type AgentRunTerminalState } from "../agent";
 import { ChatRateLimiterRegistry, parseIngameChatLine, type ChatAuditEvent } from "../chat";
 import { rebuildRuntimeIndexes, type RuntimeConfig } from "../config";
 import type { LogBufferSnapshot } from "../log";
@@ -33,6 +33,7 @@ export interface MentionRouterOptions {
   readonly now?: () => number;
   readonly sleep?: (ms: number) => Promise<void>;
   readonly pollMs?: number;
+  readonly runWaitTimeoutMs?: number;
 }
 
 export class MentionRouter {
@@ -70,7 +71,7 @@ export class MentionRouter {
     const context = recentContext(this.options.logSnapshot(result.serverId, agent.ingameMessageWindow + 1), triggerLine, agent.ingameMessageWindow);
     const message = context.length === 0 ? result.mention.message : `Recent server context:\n${context.join("\n")}\n\nPlayer message:\n${result.mention.message}`;
     const run = await this.options.agentExecutor.chat({ serverId: result.serverId, agentId: result.mention.agentId, message, playerName: result.playerName });
-    const state = await waitForRun(run.runId, this.options.agentExecutor.runState.bind(this.options.agentExecutor), this.options.sleep ?? sleep, this.options.pollMs ?? 100);
+    const state = await waitForRun(run.runId, this.options.agentExecutor.runState.bind(this.options.agentExecutor), this.options.sleep ?? sleep, this.options.pollMs ?? 100, this.options.runWaitTimeoutMs ?? agent.timeout + 1_000);
     if (state.status !== "completed") return;
     await deliverInGame({
       serverId: result.serverId,
@@ -86,7 +87,7 @@ export class MentionRouter {
 }
 
 export function stripFormatting(text: string): string {
-  return text.replace(/[§&][0-9A-FK-ORa-fk-or]/g, "");
+  return text.replace(/§[0-9A-FK-ORa-fk-or]/g, "");
 }
 
 export function splitIntoChunks(text: string, limit = TELLRAW_CHUNK_LIMIT): readonly string[] {
@@ -131,7 +132,7 @@ export async function deliverInGame(options: {
       options.audit?.(audit(options, "tellraw_skipped", "failed", "OFFLINE_FAIL"));
       return { ok: false, code: "OFFLINE_FAIL", chunksDelivered: delivered };
     } else {
-      const fallback = await options.sendCommand(options.serverId, `/say [${options.agentAlias}] ${chunk}`);
+      const fallback = await options.sendCommand(options.serverId, `/say [${options.agentAlias}] ${singleConsoleLine(chunk)}`);
       if (!fallback.ok) return { ok: false, code: "OFFLINE_FAIL", chunksDelivered: delivered };
       delivered++;
       options.audit?.(audit(options, "say_fallback", "ok", `chunk ${index + 1}/${chunks.length}`));
@@ -172,12 +173,18 @@ function recentContext(snapshot: LogBufferSnapshot, triggerLine: string, limit: 
   return snapshot.lines.map((line) => line.text).filter((line) => line !== triggerLine).slice(-limit);
 }
 
-async function waitForRun(runId: string, runState: (runId: string) => AgentRunTerminalState | undefined, sleeper: (ms: number) => Promise<void>, pollMs: number): Promise<AgentRunTerminalState> {
-  while (true) {
+async function waitForRun(runId: string, runState: (runId: string) => AgentRunTerminalState | undefined, sleeper: (ms: number) => Promise<void>, pollMs: number, timeoutMs: number): Promise<AgentRunTerminalState> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     const state = runState(runId);
     if (state !== undefined && state.status !== "running") return state;
     await sleeper(pollMs);
   }
+  return { status: "failed", error: new AgentExecutorError("PROVIDER_TIMEOUT", `Timed out waiting for agent run ${runId}.`) };
+}
+
+function singleConsoleLine(text: string): string {
+  return text.replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
 }
 
 function bestSplitIndex(text: string, limit: number): number {

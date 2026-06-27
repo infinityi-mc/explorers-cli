@@ -32,6 +32,30 @@ describe("server lifecycle manager", () => {
     }
   });
 
+  test("sendCommand rejects embedded newlines", async () => {
+    const dir = tempDir();
+    try {
+      let stdin = "";
+      const child = stubChild({ pid: 126, stdout: "Done!\n" });
+      const manager = new ServerLifecycleManager({
+        servers: { survival: serverConfig(dir) },
+        pidRegistry: registry({}),
+        spawn: () => ({ ...child, writeStdin: (line) => { stdin += line; } }),
+        portFree: async () => true,
+        killPid: async () => {},
+      });
+
+      await manager.start("survival");
+      const result = await manager.sendCommand("survival", "/say hi\n/op Steve");
+
+      expect(result.ok).toBe(false);
+      expect(stdin).toBe("");
+      child.resolveExit(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("stop tolerates exit watcher cleanup while stdin write is still pending", async () => {
     const dir = tempDir();
     try {

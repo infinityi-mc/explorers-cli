@@ -187,7 +187,9 @@ export class ServerLifecycleManager {
     if (entry?.child === undefined || entry.pid === undefined || entry.state !== "RUNNING") {
       return failure("NOT_RUNNING", `Server "${serverId}" is not running.`, { serverId });
     }
-    await entry.child.writeStdin(line.endsWith("\n") ? line : `${line}\n`);
+    const command = line.replace(/[\r\n]+$/g, "");
+    if (/[\r\n]/.test(command)) return failure("INTERNAL_ERROR", "Console commands must be a single line.", { serverId });
+    await entry.child.writeStdin(`${command}\n`);
     return { ok: true, serverId, state: entry.state, pid: entry.pid };
   }
 
