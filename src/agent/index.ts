@@ -94,7 +94,7 @@ export class AgentExecutor {
     for (const agent of Object.values(options.config.agents)) this.agents.set(agent.id, this.define(agent));
   }
 
-  async chat(input: { readonly serverId?: string; readonly agentId: string; readonly message: string }): Promise<AgentRunResponse> {
+  async chat(input: { readonly serverId?: string; readonly agentId: string; readonly message: string; readonly playerName?: string }): Promise<AgentRunResponse> {
     const configAgent = this.options.config.agents[input.agentId];
     const agent = this.agents.get(input.agentId);
     if (configAgent === undefined || agent === undefined) {
@@ -114,7 +114,7 @@ export class AgentExecutor {
     const partial: string[] = [];
     const handle = runAgent(agent, {
       runId,
-      input: userMessage(input.message),
+      input: userMessage(input.message, input.playerName ?? "operator"),
       session,
       stream: true,
       maxSteps: 16,
@@ -269,8 +269,8 @@ function buildProviderRegistry(config: RuntimeConfig): Record<string, Provider> 
   return providers;
 }
 
-function userMessage(text: string): Message {
-  return { role: "user", content: [{ type: "text", text }], metadata: { playerContext: { playerName: "operator" } } };
+function userMessage(text: string, playerName: string): Message {
+  return { role: "user", content: [{ type: "text", text }], metadata: { playerContext: { playerName } } };
 }
 
 function assistantMessage(text: string): Message {
