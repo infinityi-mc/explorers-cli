@@ -4,7 +4,7 @@ import {
   createSqliteDialect,
   createSqliteDriver,
 } from "@infinityi/forge/data/dialects/sqlite";
-import { forgeDataAuditLog } from "@infinityi/engine-lib/governance";
+import { forgeDataAuditLog, type AuditLog } from "@infinityi/engine-lib/governance";
 import { ForgeDataSessionStore } from "@infinityi/engine-lib/session-stores";
 import type { SessionStore } from "@infinityi/engine-lib/session";
 import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -20,6 +20,7 @@ export interface PersistenceState {
   readonly dbPath: string;
   readonly pidRegistry: PidRegistry;
   readonly sessionStore: SessionStore;
+  readonly auditLog: AuditLog;
   readonly db: Db<Record<string, Record<string, unknown>>>;
   stop(): Promise<void>;
 }
@@ -62,7 +63,8 @@ export async function startPersistence(options: {
     });
     sessionStore = new ForgeDataSessionStore({ db });
     await sessionStore.migrate();
-    await forgeDataAuditLog({ db, table: "audit_entries" }).migrate();
+    const auditLog = forgeDataAuditLog({ db, table: "audit_entries" });
+    await auditLog.migrate();
     await db.raw(sql`
       create table if not exists pruning_state (
         sessionId text primary key,
@@ -80,6 +82,7 @@ export async function startPersistence(options: {
       dbPath,
       pidRegistry,
       sessionStore,
+      auditLog,
       db,
       async stop() {
         const cleanupErrors: unknown[] = [];

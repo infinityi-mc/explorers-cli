@@ -8,6 +8,7 @@ import {
 } from "@infinityi/engine-lib/errors";
 import { runAgent, type RunEvent, type RunHandle } from "@infinityi/engine-lib/execution";
 import type { Message, TextPart } from "@infinityi/engine-lib/messages";
+import type { ToolDefinition } from "@infinityi/engine-lib/tools";
 import {
   createAnthropic,
   createOpenAI,
@@ -55,6 +56,7 @@ export interface AgentExecutorOptions {
   readonly config: RuntimeConfig;
   readonly sessionStore?: SessionStore;
   readonly providers?: Readonly<Record<string, Provider>>;
+  readonly toolsFor?: (input: { readonly serverId?: string; readonly agentId: string }) => readonly ToolDefinition[];
   readonly now?: () => number;
 }
 
@@ -82,7 +84,6 @@ export class AgentExecutorError extends Error {
 }
 
 export class AgentExecutor {
-  private readonly agents = new Map<string, AgentDefinition>();
   private readonly handles = new Map<string, RunHandle>();
   private readonly runs = new Map<string, AgentRunTerminalState>();
   private readonly sessions: SharedSessionManager;
@@ -91,19 +92,18 @@ export class AgentExecutor {
   constructor(private readonly options: AgentExecutorOptions) {
     this.providers = options.providers ?? buildProviderRegistry(options.config);
     this.sessions = new SharedSessionManager(options.sessionStore ?? new InMemorySessionStore(), options.now);
-    for (const agent of Object.values(options.config.agents)) this.agents.set(agent.id, this.define(agent));
   }
 
   async chat(input: { readonly serverId?: string; readonly agentId: string; readonly message: string; readonly playerName?: string }): Promise<AgentRunResponse> {
     const configAgent = this.options.config.agents[input.agentId];
-    const agent = this.agents.get(input.agentId);
-    if (configAgent === undefined || agent === undefined) {
+    if (configAgent === undefined) {
       throw new AgentExecutorError("AGENT_NOT_FOUND", `No agent named "${input.agentId}" is configured.`, { agentId: input.agentId });
     }
     if (input.serverId !== undefined && this.options.config.servers[input.serverId] === undefined) {
       throw new AgentExecutorError("SERVER_NOT_FOUND", `No server named "${input.serverId}" is configured.`, { serverId: input.serverId });
     }
 
+    const agent = this.define(configAgent, input.serverId);
     const session = input.serverId === undefined
       ? createSession()
       : await this.sessions.active(input.serverId, input.agentId, agent.provider.name, agent.provider.defaultModel);
@@ -119,6 +119,7 @@ export class AgentExecutor {
       stream: true,
       maxSteps: 16,
       maxHandoffs: 8,
+      principal: input.playerName ?? "operator",
       signal: controller.signal,
       onEvent: (event) => {
         if (event.type === "token") partial.push(event.delta);
@@ -150,10 +151,10 @@ export class AgentExecutor {
     return this.sessions.clear(filter);
   }
 
-  private define(agent: AgentConfig): AgentDefinition {
+  private define(agent: AgentConfig, serverId?: string): AgentDefinition {
     const provider = this.providers[agent.provider];
     if (provider === undefined) throw new AgentExecutorError("INTERNAL_ERROR", `Provider "${agent.provider}" is not configured.`, { provider: agent.provider });
-    return defineAgent({ name: agent.id, provider, instructions: agent.systemPrompt, tools: [] });
+    return defineAgent({ name: agent.id, provider, instructions: agent.systemPrompt, tools: [...(this.options.toolsFor?.({ serverId, agentId: agent.id }) ?? [])] });
   }
 
   private async finalizeRun(runId: string, handle: RunHandle, session: Session, partial: readonly string[], timeout: ReturnType<typeof setTimeout>): Promise<void> {

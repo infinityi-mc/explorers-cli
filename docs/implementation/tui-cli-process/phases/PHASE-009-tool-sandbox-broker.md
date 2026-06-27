@@ -1,6 +1,6 @@
 # PHASE-009 - Tool Sandbox Broker
 
-**Status**: Planned  
+**Status**: In Progress
 **Goal**: Register the v1 agent tools and enforce command/file sandbox policies with contract and audit evidence.  
 **Depends on**: PHASE-007, PHASE-008  
 **LLD sources**: `design.md` Tool Sandbox Broker mapping; `api.md` Agent tools; `openapi.yaml` `/agent-tools/*`; `sequences.md` section 6; `errors.md` tool codes; `observability.md` `tool_blocked`; ADR-LLD-001; `tests.md` Security scenarios  
