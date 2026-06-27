@@ -83,6 +83,41 @@ describe("tool sandbox broker", () => {
     }
   });
 
+  test("write_file creates missing nested directories inside sandbox", async () => {
+    const dir = tempDir();
+    try {
+      const broker = new ToolSandboxBroker({ config: fixtureConfig(dir), lifecycle: lifecycle("STOPPED", []) });
+
+      const result = await tool(broker, "write_file").execute({ path: "plugins/newdir/config.json", content: "{}" }, context());
+
+      expect(result.ok).toBe(true);
+      expect(await readFile(join(dir, "plugins", "newdir", "config.json"), "utf8")).toBe("{}");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("filesystem operation errors return recoverable failures and failed audit", async () => {
+    const dir = tempDir();
+    const entries: unknown[] = [];
+    try {
+      const broker = new ToolSandboxBroker({
+        config: fixtureConfig(dir),
+        lifecycle: lifecycle("STOPPED", []),
+        auditLog: { record: async (entry) => { entries.push(entry); } },
+      });
+
+      const readResult = await tool(broker, "read_file").execute({ path: "." }, context());
+      const writeResult = await tool(broker, "write_file").execute({ path: ".", content: "nope" }, context());
+
+      expect(readResult.ok).toBe(false);
+      expect(writeResult.ok).toBe(false);
+      expect(JSON.stringify(entries)).toContain('"outcome":"failed"');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("symlink escape is blocked", async () => {
     const dir = tempDir();
     const outside = tempDir();
@@ -115,6 +150,28 @@ describe("tool sandbox broker", () => {
 
       expect(result.ok).toBe(false);
       expect(result.ok ? "" : result.error).toContain("FILE_BLOCKED");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("running server blocks NBT-sensitive symlink targets", async () => {
+    const dir = tempDir();
+    try {
+      await mkdir(join(dir, "world"), { recursive: true });
+      writeFileSync(join(dir, "world", "level.dat"), "old", "utf8");
+      try {
+        symlinkSync(join(dir, "world", "level.dat"), join(dir, "linked.txt"));
+      } catch {
+        return;
+      }
+      const broker = new ToolSandboxBroker({ config: fixtureConfig(dir), lifecycle: lifecycle("RUNNING", []) });
+
+      const result = await tool(broker, "write_file").execute({ path: "linked.txt", content: "new" }, context());
+
+      expect(result.ok).toBe(false);
+      expect(result.ok ? "" : result.error).toContain("FILE_BLOCKED");
+      expect(await readFile(join(dir, "world", "level.dat"), "utf8")).toBe("old");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

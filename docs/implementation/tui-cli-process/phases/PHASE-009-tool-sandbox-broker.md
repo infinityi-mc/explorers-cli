@@ -35,10 +35,10 @@
 1. Create a per-server/per-agent tool factory that consumes current config and Server Process Manager state.
 2. Register `run_command` as a Minecraft console command tool with exact token-prefix allowlist semantics.
 3. Return `OFFLINE_FAIL` for command execution when the target server is not RUNNING.
-4. Register `read_file` and `write_file` through `engine-lib/tools-fs` with `allowedRoots:[server.path]`.
-5. Enforce symlink escape and cross-server path denial through engine-lib filesystem policies.
+4. Register `read_file` and `write_file` with `defineTool` and direct filesystem access inside `server.path`.
+5. Enforce symlink escape and cross-server path denial with canonical path containment checks.
 6. Add custom deny rule for `.nbt`, `.dat`, `.mca`, and `.schem` writes while server is RUNNING.
-7. Compose shell and filesystem policies through engine-lib governance.
+7. Record tool outcomes through `auditLog.record()` with redacted targets and argument digests.
 8. Attach tools to agent definitions and ensure provider-advertised schemas match `openapi.yaml`.
 9. Return recoverable ToolFailure for domain denials and throw only for unexpected implementation faults.
 10. Emit audit entries for `command_exec`, `file_read`, and `file_write` with redacted target and `argumentsDigest`.

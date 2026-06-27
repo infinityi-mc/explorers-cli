@@ -76,9 +76,15 @@ export class ToolSandboxBroker {
           await this.audit({ serverId, agentId, playerName, actionType: "file_read", target: redactTarget(path), outcome: "blocked", detail: resolved.error, argumentsDigest: digest });
           return failure(resolved.code, resolved.error);
         }
-        const content = await readFile(resolved.path, "utf8");
-        await this.audit({ serverId, agentId, playerName, actionType: "file_read", target: redactTarget(path), outcome: "ok", detail: `read ${content.length} chars`, argumentsDigest: digest });
-        return { ok: true, content };
+        try {
+          const content = await readFile(resolved.path, "utf8");
+          await this.audit({ serverId, agentId, playerName, actionType: "file_read", target: redactTarget(path), outcome: "ok", detail: `read ${content.length} chars`, argumentsDigest: digest });
+          return { ok: true, content };
+        } catch (error) {
+          const detail = fsErrorDetail(error);
+          await this.audit({ serverId, agentId, playerName, actionType: "file_read", target: redactTarget(path), outcome: "failed", detail, argumentsDigest: digest });
+          return failure("FILE_BLOCKED", `File access blocked: ${detail}.`);
+        }
       },
     });
   }
@@ -96,14 +102,20 @@ export class ToolSandboxBroker {
           await this.audit({ serverId, agentId, playerName, actionType: "file_write", target: redactTarget(path), outcome: "blocked", detail: resolved.error, argumentsDigest: digest });
           return failure(resolved.code, resolved.error);
         }
-        if (this.options.lifecycle.snapshot(serverId).state === "RUNNING" && isNbtSensitive(path)) {
+        if (this.options.lifecycle.snapshot(serverId).state === "RUNNING" && isNbtSensitive(resolved.path)) {
           await this.audit({ serverId, agentId, playerName, actionType: "file_write", target: redactTarget(path), outcome: "blocked", detail: "FILE_BLOCKED", argumentsDigest: digest });
           return failure("FILE_BLOCKED", "File access blocked: NBT-sensitive writes are blocked while the server is running.");
         }
-        await mkdir(dirname(resolved.path), { recursive: true });
-        await writeFile(resolved.path, content, "utf8");
-        await this.audit({ serverId, agentId, playerName, actionType: "file_write", target: redactTarget(path), outcome: "ok", detail: `wrote ${content.length} chars`, argumentsDigest: digest });
-        return { ok: true, content: `wrote ${content.length} bytes to ${path}` };
+        try {
+          await mkdir(dirname(resolved.path), { recursive: true });
+          await writeFile(resolved.path, content, "utf8");
+          await this.audit({ serverId, agentId, playerName, actionType: "file_write", target: redactTarget(path), outcome: "ok", detail: `wrote ${content.length} chars`, argumentsDigest: digest });
+          return { ok: true, content: `wrote ${content.length} bytes to ${path}` };
+        } catch (error) {
+          const detail = fsErrorDetail(error);
+          await this.audit({ serverId, agentId, playerName, actionType: "file_write", target: redactTarget(path), outcome: "failed", detail, argumentsDigest: digest });
+          return failure("FILE_BLOCKED", `File access blocked: ${detail}.`);
+        }
       },
     });
   }
@@ -121,7 +133,7 @@ export class ToolSandboxBroker {
       return { ok: true, path: canonical };
     } catch (error) {
       if (!allowMissing || !isMissingPath(error)) return { ok: false, code: "FILE_BLOCKED", error: "File access blocked: path does not exist." };
-      const parent = await realpath(dirname(candidate)).catch(() => undefined);
+      const parent = await nearestExistingParent(root, dirname(candidate));
       if (parent === undefined || !isContained(root, parent)) return { ok: false, code: "PATH_TRAVERSAL_BLOCKED", error: "Path resolves outside the canonical server.path." };
       return { ok: true, path: candidate };
     }
@@ -166,6 +178,18 @@ function isNbtSensitive(path: string): boolean {
   return new Set([".nbt", ".dat", ".mca", ".schem"]).has(extname(path).toLowerCase());
 }
 
+async function nearestExistingParent(root: string, start: string): Promise<string | undefined> {
+  let current = start;
+  while (isContained(root, current)) {
+    const parent = await realpath(current).catch(() => undefined);
+    if (parent !== undefined) return parent;
+    const next = dirname(current);
+    if (next === current) return undefined;
+    current = next;
+  }
+  return undefined;
+}
+
 function failure(code: ToolBrokerErrorCode, message: string): ToolResult {
   return { ok: false, error: `${code}: ${message}` };
 }
@@ -182,6 +206,11 @@ function digestArgs(args: unknown): string {
 
 function redactTarget(target: string): string {
   return target.replace(/[A-Za-z0-9_]*secret[A-Za-z0-9_]*/gi, "[REDACTED]").slice(0, 200);
+}
+
+function fsErrorDetail(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string") return error.code;
+  return "filesystem error";
 }
 
 function isMissingPath(error: unknown): boolean {
