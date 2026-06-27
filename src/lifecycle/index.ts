@@ -11,13 +11,14 @@ import { dirname, join } from "node:path";
 import { AGENT_COMPONENT, AgentExecutor } from "../agent";
 import { CHAT_COMPONENT } from "../chat";
 import type { LoadedRuntimeConfig, RuntimeOptions } from "../config";
-import { LOG_COMPONENT } from "../log";
+import { LOG_COMPONENT, ServerLogStore } from "../log";
+import { MENTION_COMPONENT, MentionRouter } from "../mention";
 import {
   PERSISTENCE_COMPONENT,
   startPersistence,
   type PersistenceState,
 } from "../persistence";
-import { PROCESS_COMPONENT } from "../process";
+import { PROCESS_COMPONENT, ServerLifecycleManager } from "../process";
 import { OperatorRouter, ROUTER_COMPONENT } from "../router";
 import { TOOLS_COMPONENT } from "../tools";
 import { createAppViewModel, type StartTui, type StopTui } from "../tui";
@@ -54,6 +55,9 @@ export function createFoundationComponents(
   let persistence: PersistenceState | undefined;
   let agentExecutor: AgentExecutor | undefined;
   let router: OperatorRouter | undefined;
+  let processManager: ServerLifecycleManager | undefined;
+  let logStore: ServerLogStore | undefined;
+  let mentionRouter: MentionRouter | undefined;
 
   return [
     asComponent("config", {
@@ -79,8 +83,23 @@ export function createFoundationComponents(
         persistence = undefined;
       },
     }),
-    asComponent(PROCESS_COMPONENT),
-    asComponent(LOG_COMPONENT),
+    asComponent(LOG_COMPONENT, {
+      start: () => {
+        logStore = new ServerLogStore({ onLine: (line) => mentionRouter?.handleLine(line.serverId, line.text) });
+      },
+      stop: () => {
+        logStore = undefined;
+      },
+    }),
+    asComponent(PROCESS_COMPONENT, {
+      start: () => {
+        if (persistence === undefined) throw new Error("persistence must start before process manager");
+        processManager = new ServerLifecycleManager({ servers: options.loaded.config.servers, pidRegistry: persistence.pidRegistry, logStore });
+      },
+      stop: () => {
+        processManager = undefined;
+      },
+    }),
     asComponent(CHAT_COMPONENT),
     asComponent(AGENT_COMPONENT, {
       start: () => {
@@ -95,11 +114,28 @@ export function createFoundationComponents(
         agentExecutor = undefined;
       },
     }),
+    asComponent(MENTION_COMPONENT, {
+      start: () => {
+        if (agentExecutor === undefined) throw new Error("agent executor must start before mention router");
+        if (processManager === undefined) throw new Error("process manager must start before mention router");
+        if (logStore === undefined) throw new Error("log store must start before mention router");
+        mentionRouter = new MentionRouter({
+          config: options.loaded.config,
+          agentExecutor,
+          sendCommand: (serverId, line) => processManager!.sendCommand(serverId, line),
+          logSnapshot: (serverId, limit) => logStore!.snapshot(serverId, limit),
+        });
+      },
+      stop: () => {
+        mentionRouter = undefined;
+      },
+    }),
     asComponent(ROUTER_COMPONENT, {
       start: () => {
         router = new OperatorRouter({
           runtimeMode: options.runtime.mode,
           sessionStore: agentExecutor,
+          serverLifecycle: processManager,
           agentExecutor,
         });
       },

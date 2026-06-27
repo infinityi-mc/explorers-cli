@@ -82,3 +82,9 @@
 ## Risks And Questions
 
 - Delivery pacing tests must use injected time or test clock to avoid slow test suites.
+
+## Tellraw command
+
+```mcfunction
+["",{hover_event:{action:"show_text",value:["",{color:"gray",text:"Agent: "},{color:"light_purple",text:"<agent-alias>"},{},{color:"gray",text:"Player:"},{color:"aqua",text:" <player-name>"},{},{color:"gray",text:"Status:"},{color:"white",text:" <"},{color:"dark_green",text:"Success"},{color:"white",text:">"}]},text:"",extra:[{color:"white",text:"["},{color:"aqua",text:"<agent-alias>"},{color:"white",text:"]"}]},{color:"gray",text:" <agent response>"}]
+```

@@ -22,6 +22,7 @@ export interface LogStoreOptions {
   readonly capacityBytes?: number;
   readonly maxLinesPerSecond?: number;
   readonly now?: () => number;
+  readonly onLine?: (line: LogLine) => void;
 }
 
 const DEFAULT_CAPACITY_BYTES = 16 * 1024 * 1024;
@@ -33,7 +34,10 @@ export class ServerLogStore {
   constructor(private readonly options: LogStoreOptions = {}) {}
 
   ingest(serverId: string, text: string): boolean {
-    return this.buffer(serverId).push(text);
+    const line = this.buffer(serverId).push(text);
+    if (line === undefined) return false;
+    this.options.onLine?.(line);
+    return true;
   }
 
   attach(serverId: string, stream: ReadableStream<Uint8Array> | null | undefined, prefix = ""): void {
@@ -100,21 +104,21 @@ class LogRingBuffer {
 
   constructor(
     private readonly serverId: string,
-    private readonly options: Required<LogStoreOptions>,
+    private readonly options: { readonly capacityBytes: number; readonly maxLinesPerSecond: number; readonly now: () => number },
   ) {
     this.limiter = new TokenBucket(options.maxLinesPerSecond, options.now);
   }
 
-  push(text: string): boolean {
+  push(text: string): LogLine | undefined {
     if (!this.limiter.tryAcquire()) {
       this.droppedRateLimited++;
-      return false;
+      return undefined;
     }
 
     const byteLength = new TextEncoder().encode(text).byteLength;
     if (byteLength > this.options.capacityBytes) {
       this.droppedBufferFull++;
-      return false;
+      return undefined;
     }
 
     while (this.bytes + byteLength > this.options.capacityBytes) {
@@ -125,10 +129,11 @@ class LogRingBuffer {
       this.droppedBufferFull++;
     }
 
-    this.lines.push({ serverId: this.serverId, text, timestamp: this.options.now(), byteLength });
+    const line = { serverId: this.serverId, text, timestamp: this.options.now(), byteLength };
+    this.lines.push(line);
     this.bytes += byteLength;
     this.ingested++;
-    return true;
+    return line;
   }
 
   snapshot(limit?: number): LogBufferSnapshot {

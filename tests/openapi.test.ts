@@ -15,5 +15,6 @@ describe("OpenAPI contract artifact", () => {
     expect(spec.paths?.["/operator/session"]).toBeDefined();
     expect(spec.paths?.["/operator/resume"]).toBeDefined();
     expect(spec.paths?.["/operator/clear"]).toBeDefined();
+    expect((spec.paths?.["/ingame/tellraw"] as { post?: unknown } | undefined)?.post).toBeDefined();
   });
 });

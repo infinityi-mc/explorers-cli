@@ -180,6 +180,19 @@ export class ServerLifecycleManager {
     return this.start(serverId);
   }
 
+  async sendCommand(serverId: string, line: string): Promise<LifecycleResult> {
+    const server = this.options.servers[serverId];
+    if (server === undefined) return failure("SERVER_NOT_FOUND", `No server named "${serverId}" is configured.`, { serverId });
+    const entry = this.runtime.get(serverId);
+    if (entry?.child === undefined || entry.pid === undefined || entry.state !== "RUNNING") {
+      return failure("NOT_RUNNING", `Server "${serverId}" is not running.`, { serverId });
+    }
+    const command = line.replace(/[\r\n]+$/g, "");
+    if (/[\r\n]/.test(command)) return failure("INTERNAL_ERROR", "Console commands must be a single line.", { serverId });
+    await entry.child.writeStdin(`${command}\n`);
+    return { ok: true, serverId, state: entry.state, pid: entry.pid };
+  }
+
   private async validate(server: ServerConfig): Promise<{ readonly ok: true } | LifecycleFailure> {
     let root: string;
     try {

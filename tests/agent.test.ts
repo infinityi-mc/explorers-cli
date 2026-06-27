@@ -45,6 +45,23 @@ describe("agent executor", () => {
     expect(await executor.list()).toEqual([]);
   });
 
+  test("online chat persists in-game player context", async () => {
+    const store = new InMemorySessionStore();
+    const executor = new AgentExecutor({
+      config: fixtureConfig(),
+      sessionStore: store,
+      providers: { mock: mockProvider() },
+    });
+
+    const run = await executor.chat({ serverId: "survival", agentId: "assistant", message: "hi", playerName: "Steve" });
+    await executor.runHandle(run.runId)?.completed;
+
+    const session = (await executor.list())[0];
+    expect(session).toBeDefined();
+    const detail = await executor.resume(session!.sessionId);
+    expect(detail?.messages[0]?.playerContext).toEqual({ playerName: "Steve" });
+  });
+
   test("clear resets persisted session boundary", async () => {
     const store = new InMemorySessionStore();
     const executor = new AgentExecutor({
