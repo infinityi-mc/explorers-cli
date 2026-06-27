@@ -57,7 +57,7 @@ export class ToolSandboxBroker {
           await this.audit({ serverId, agentId: agent.id, playerName, actionType: "command_exec", target, outcome: "failed", detail: code, argumentsDigest: digest });
           return failure(code, result.message ?? code);
         }
-        await this.audit({ serverId, agentId: agent.id, playerName, actionType: "command_exec", target, outcome: "ok", detail: "sent", argumentsDigest: digest });
+        await this.auditBestEffort({ serverId, agentId: agent.id, playerName, actionType: "command_exec", target, outcome: "ok", detail: "sent", argumentsDigest: digest });
         return { ok: true, content: `sent ${command}` };
       },
     });
@@ -78,7 +78,7 @@ export class ToolSandboxBroker {
         }
         try {
           const content = await readFile(resolved.path, "utf8");
-          await this.audit({ serverId, agentId, playerName, actionType: "file_read", target: redactTarget(path), outcome: "ok", detail: `read ${content.length} chars`, argumentsDigest: digest });
+          await this.auditBestEffort({ serverId, agentId, playerName, actionType: "file_read", target: redactTarget(path), outcome: "ok", detail: `read ${content.length} chars`, argumentsDigest: digest });
           return { ok: true, content };
         } catch (error) {
           const detail = fsErrorDetail(error);
@@ -109,7 +109,7 @@ export class ToolSandboxBroker {
         try {
           await mkdir(dirname(resolved.path), { recursive: true });
           await writeFile(resolved.path, content, "utf8");
-          await this.audit({ serverId, agentId, playerName, actionType: "file_write", target: redactTarget(path), outcome: "ok", detail: `wrote ${content.length} chars`, argumentsDigest: digest });
+          await this.auditBestEffort({ serverId, agentId, playerName, actionType: "file_write", target: redactTarget(path), outcome: "ok", detail: `wrote ${content.length} chars`, argumentsDigest: digest });
           return { ok: true, content: `wrote ${content.length} bytes to ${path}` };
         } catch (error) {
           const detail = fsErrorDetail(error);
@@ -148,6 +148,10 @@ export class ToolSandboxBroker {
       principal: entry.playerName,
       detail: entry,
     });
+  }
+
+  private async auditBestEffort(entry: { readonly serverId: string; readonly agentId: string; readonly playerName: string; readonly actionType: string; readonly target: string; readonly outcome: "ok"; readonly detail: string; readonly argumentsDigest: string }): Promise<void> {
+    await this.audit(entry).catch(() => {});
   }
 }
 

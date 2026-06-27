@@ -196,6 +196,28 @@ describe("tool sandbox broker", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test("success audit failures do not undo completed tool results", async () => {
+    const dir = tempDir();
+    const sent: string[] = [];
+    try {
+      const broker = new ToolSandboxBroker({
+        config: fixtureConfig(dir, { commandAllowlist: ["say"] }),
+        lifecycle: lifecycle("RUNNING", sent),
+        auditLog: { record: async () => { throw new Error("audit down"); } },
+      });
+
+      const commandResult = await tool(broker, "run_command").execute({ command: "say hi" }, context());
+      const writeResult = await tool(broker, "write_file").execute({ path: "config.txt", content: "ok" }, context());
+
+      expect(commandResult.ok).toBe(true);
+      expect(writeResult.ok).toBe(true);
+      expect(sent).toEqual(["say hi"]);
+      expect(await readFile(join(dir, "config.txt"), "utf8")).toBe("ok");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 function tool(broker: ToolSandboxBroker, name: string) {
